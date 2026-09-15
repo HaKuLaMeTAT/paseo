@@ -431,6 +431,18 @@ async function expectInterruptedTurnOrderAfterReconnect(
   }
 }
 
+async function visitEvictionWorkspaces(
+  page: Page,
+  agents: readonly { agentId: string }[],
+): Promise<void> {
+  for (const [index, agent] of agents.entries()) {
+    await openSessions(page);
+    await clickSessionRow(page, `Workspace eviction ${index + 1}.`);
+    await expectWorkspaceTabVisible(page, agent.agentId);
+    await expectComposerVisible(page);
+  }
+}
+
 async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
   page: Page,
   testInfo: { workerIndex: number },
@@ -452,11 +464,25 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
   );
   const prompt = "Keep this hidden image prompt before its streaming output.";
   const targetDeckEntry = workspaceDeckEntryLocator(page, getServerId(), target.workspaceId);
+  const openAgentIds = [target.agentId, ...evictionAgents.map((agent) => agent.agentId)];
 
   try {
     await openAgentRoute(page, target);
     await expectComposerVisible(page);
-    await subscriptions.waitForSubscribedAgents([target.agentId]);
+    // Open every chat before holding output. Adding chats replaces the timeline
+    // subscription and retires the IDs stamped on already-buffered frames.
+    await visitEvictionWorkspaces(page, evictionAgents);
+    await subscriptions.waitForSubscribedAgents(openAgentIds);
+    await switchWorkspaceViaSidebar({
+      page,
+      serverId: getServerId(),
+      workspaceId: target.workspaceId,
+    });
+    await expectWorkspaceTabVisible(page, target.agentId);
+    await expectComposerVisible(page);
+    const subscriptionRequests = gate.getClientRequestCount(
+      "agent.timeline.set_subscription.request",
+    );
 
     const userMessageCount = gate.getAgentStreamItemCount("user_message");
     gate.setAgentStreamItemSuppressed("user_message", true);
@@ -464,23 +490,18 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     const promptRow = await submitMessageWithImage(page, prompt);
     await gate.waitForAgentStreamItem("user_message", userMessageCount + 1);
     await gate.waitForHeldAgentStreamEvent("turn_started");
+    // Finish production before navigation so passing cannot depend on late
+    // chunks arriving after the final workspace switch.
+    await target.client.waitForFinish(target.agentId, 30_000);
 
     // Navigate inside the app: a document reload discards the retained deck and
     // adds startup history fetches, so it cannot prove eviction/resume behavior.
-    for (const [index, evictionAgent] of evictionAgents.entries()) {
-      await openSessions(page);
-      await clickSessionRow(page, `Workspace eviction ${index + 1}.`);
-      await expectWorkspaceTabVisible(page, evictionAgent.agentId);
-      await expectComposerVisible(page);
-    }
+    await visitEvictionWorkspaces(page, evictionAgents);
     await expect(targetDeckEntry).toHaveCount(0);
-    await subscriptions.waitForSubscribedAgents([
-      target.agentId,
-      ...evictionAgents.map((agent) => agent.agentId),
-    ]);
-    // Let the producer finish before delivery so this also covers navigation
-    // slower than the stream. Dropping output here races the runner's speed.
-    await target.client.waitForFinish(target.agentId, 30_000);
+    await subscriptions.waitForSubscribedAgents(openAgentIds);
+    expect(gate.getClientRequestCount("agent.timeline.set_subscription.request")).toBe(
+      subscriptionRequests,
+    );
     gate.releaseHeldAgentStreamEvent("turn_started");
     const requestsBeforeReturn = rememberTimelineRequestCounts(gate, target.agentId);
     await waitForWorkspaceInSidebar(page, {
@@ -493,14 +514,14 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
       workspaceId: target.workspaceId,
     });
     await expectComposerVisible(page);
-    await subscriptions.waitForSubscribedAgents([
-      target.agentId,
-      ...evictionAgents.map((agent) => agent.agentId),
-    ]);
+    await subscriptions.waitForSubscribedAgents(openAgentIds);
 
+    const responseStart = page.getByText("Cycle 1", { exact: true });
     const response = page.getByText("(end of synthetic stream)", { exact: true }).last();
     await expect(promptRow).toBeVisible();
+    await expect(responseStart).toBeVisible();
     await expect(response).toBeVisible();
+    await expectRenderedBefore(promptRow, responseStart);
     await expectRenderedBefore(promptRow, response);
     // Open chats stay subscribed when their workspace view is evicted. Returning
     // uses that live timeline without another resume check or startup tail fetch.
