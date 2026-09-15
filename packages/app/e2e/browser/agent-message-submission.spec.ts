@@ -459,9 +459,11 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     await subscriptions.waitForSubscribedAgents([target.agentId]);
 
     const userMessageCount = gate.getAgentStreamItemCount("user_message");
-    gate.setAgentStreamSuppressed(true);
+    gate.setAgentStreamItemSuppressed("user_message", true);
+    gate.holdNextAgentStreamEvent("turn_started");
     const promptRow = await submitMessageWithImage(page, prompt);
     await gate.waitForAgentStreamItem("user_message", userMessageCount + 1);
+    await gate.waitForHeldAgentStreamEvent("turn_started");
 
     // Navigate inside the app: a document reload discards the retained deck and
     // adds startup history fetches, so it cannot prove eviction/resume behavior.
@@ -476,9 +478,10 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
       target.agentId,
       ...evictionAgents.map((agent) => agent.agentId),
     ]);
-    gate.setAgentStreamSuppressed(false);
-
+    // Let the producer finish before delivery so this also covers navigation
+    // slower than the stream. Dropping output here races the runner's speed.
     await target.client.waitForFinish(target.agentId, 30_000);
+    gate.releaseHeldAgentStreamEvent("turn_started");
     const requestsBeforeReturn = rememberTimelineRequestCounts(gate, target.agentId);
     await waitForWorkspaceInSidebar(page, {
       serverId: getServerId(),
@@ -503,7 +506,7 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     // uses that live timeline without another resume check or startup tail fetch.
     expect(rememberTimelineRequestCounts(gate, target.agentId)).toEqual(requestsBeforeReturn);
   } finally {
-    gate.setAgentStreamSuppressed(false);
+    gate.setAgentStreamItemSuppressed("user_message", false);
     gate.restore();
     await Promise.all([...evictionAgents.map((agent) => agent.cleanup()), target.cleanup()]);
   }
