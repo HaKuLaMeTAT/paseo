@@ -125,6 +125,10 @@ function isAudioOutput(message: SessionOutboundMessage): boolean {
   return message.type === "audio_output";
 }
 
+async function waitForAudioOutput(host: FakeVoiceHost): Promise<void> {
+  await vi.waitFor(() => expect(host.emitted.filter(isAudioOutput)).toHaveLength(1));
+}
+
 async function settle(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -140,13 +144,14 @@ describe("VoiceSession streaming transcription", () => {
     };
     const { voiceSession, detector, host, speak } = createVoiceSession(tts);
     const interrupted: string[] = [];
-    host.interruptAgentIfRunning = async (agentId) => {
+    async function recordInterruption(agentId: string) {
       interrupted.push(agentId);
-    };
+    }
+    host.interruptAgentIfRunning = recordInterruption;
     await voiceSession.handleSetVoiceMode(true, VOICE_AGENT_ID);
     const playback = speak({ text: "A spoken response." });
     try {
-      await vi.waitFor(() => expect(host.emitted.filter(isAudioOutput)).toHaveLength(1));
+      await waitForAudioOutput(host);
       detector.emit("speech_started");
       await settle();
       expect(host.emitted).toContainEqual({
@@ -171,18 +176,19 @@ describe("VoiceSession streaming transcription", () => {
     const external = new AbortController();
     let abortRequested = false;
     const emit = host.emit;
-    host.emit = (message) => {
+    function acknowledgeLaterAudio(message: SessionOutboundMessage) {
       emit(message);
       if (message.type === "audio_output" && abortRequested)
         voiceSession.handleAudioPlayed(message.payload.id);
-    };
+    }
+    host.emit = acknowledgeLaterAudio;
     await voiceSession.handleSetVoiceMode(true, VOICE_AGENT_ID);
     const playback = speak({
       text: "First sentence. Second sentence. Third sentence.",
       signal: external.signal,
     });
     try {
-      await vi.waitFor(() => expect(host.emitted.filter(isAudioOutput)).toHaveLength(1));
+      await waitForAudioOutput(host);
       abortRequested = true;
       await voiceSession.handleAbort();
       await playback;

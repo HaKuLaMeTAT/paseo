@@ -46,6 +46,18 @@ function createTts(numThreads?: number, beforeGenerate?: () => Promise<void>) {
   return { tts, requests, nativeConfig, released };
 }
 
+async function yieldNativeQueue(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+function holdNativeSynthesis() {
+  const pending: Array<() => void> = [];
+  function wait() {
+    return new Promise<void>((resolve) => pending.push(resolve));
+  }
+  return { pending, wait };
+}
+
 describe("SherpaOnnxTTS", () => {
   it("requests Electron-compatible copied samples and returns PCM audio", async () => {
     const { tts, requests } = createTts();
@@ -58,21 +70,18 @@ describe("SherpaOnnxTTS", () => {
   });
 
   it("keeps the event loop available and serializes native synthesis", async () => {
-    const pending: Array<() => void> = [];
-    const { tts, requests } = createTts(
-      undefined,
-      () => new Promise<void>((resolve) => pending.push(resolve)),
-    );
+    const { pending, wait } = holdNativeSynthesis();
+    const { tts, requests } = createTts(undefined, wait);
     const first = tts.synthesizeSpeech("first");
     const second = tts.synthesizeSpeech("second");
     try {
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      await yieldNativeQueue();
       expect(requests).toEqual([]);
       expect(pending).toHaveLength(1);
       pending.shift()!();
       const audio = await first;
       audio.stream.destroy();
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      await yieldNativeQueue();
       expect(requests).toHaveLength(1);
       expect(pending).toHaveLength(1);
       pending.shift()!();
@@ -103,21 +112,18 @@ describe("SherpaOnnxTTS", () => {
   });
 
   it("waits for active native synthesis before freeing and drops queued synthesis", async () => {
-    let finish!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      finish = resolve;
-    });
-    const { tts, requests, released } = createTts(undefined, () => gate);
+    const { pending, wait } = holdNativeSynthesis();
+    const { tts, requests, released } = createTts(undefined, wait);
     const first = tts.synthesizeSpeech("first");
     const second = tts.synthesizeSpeech("second");
     const rejected = expect(second).rejects.toThrow("TTS provider closed");
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await yieldNativeQueue();
     tts.free();
     expect(released).toEqual([]);
-    finish();
+    pending.shift()!();
     (await first).stream.destroy();
     await rejected;
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await yieldNativeQueue();
     expect(requests).toHaveLength(1);
     expect(released).toEqual([true]);
     await expect(tts.synthesizeSpeech("third")).rejects.toThrow("TTS provider closed");
