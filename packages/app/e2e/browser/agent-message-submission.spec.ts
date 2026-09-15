@@ -36,14 +36,17 @@ import { delayBrowserAgentCreatedStatus } from "../support/helpers/new-workspace
 import { installDaemonWebSocketGate } from "../support/helpers/daemon-websocket-gate";
 import { gotoAppShell, openSettings, selectModel } from "../support/helpers/app";
 import { observeTimelineSubscriptions } from "../support/helpers/timeline-delivery";
+import { rememberTimelineRequestCounts } from "../support/helpers/timeline-resume";
 import {
-  expectOneResumeCheckWithoutTail,
-  rememberTimelineRequestCounts,
-} from "../support/helpers/timeline-resume";
-import {
+  switchWorkspaceViaSidebar,
   waitForWorkspaceInSidebar,
   workspaceDeckEntryLocator,
 } from "../support/helpers/workspace-ui";
+import {
+  openSessions,
+  clickSessionRow,
+  expectWorkspaceTabVisible,
+} from "../support/helpers/archive-tab";
 import { expectInFlightForkAvailable } from "../support/helpers/assistant-fork";
 import {
   scrollTimelineToNewestLoadedEdge,
@@ -443,7 +446,7 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     Array.from({ length: WORKSPACE_DECK_MAX_MOUNTED_WORKSPACES }, (_unused, index) =>
       seedMockAgentWorkspace({
         repoPrefix: `submission-workspace-eviction-${testInfo.workerIndex}-${index}-`,
-        title: `Workspace eviction ${index + 1}`,
+        title: `Workspace eviction ${index + 1}.`,
       }),
     ),
   );
@@ -460,8 +463,12 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     const promptRow = await submitMessageWithImage(page, prompt);
     await gate.waitForAgentStreamItem("user_message", userMessageCount + 1);
 
-    for (const evictionAgent of evictionAgents) {
-      await openAgentRoute(page, evictionAgent);
+    // Navigate inside the app: a document reload discards the retained deck and
+    // adds startup history fetches, so it cannot prove eviction/resume behavior.
+    for (const [index, evictionAgent] of evictionAgents.entries()) {
+      await openSessions(page);
+      await clickSessionRow(page, `Workspace eviction ${index + 1}.`);
+      await expectWorkspaceTabVisible(page, evictionAgent.agentId);
       await expectComposerVisible(page);
     }
     await expect(targetDeckEntry).toHaveCount(0);
@@ -477,7 +484,11 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
       serverId: getServerId(),
       workspaceId: target.workspaceId,
     });
-    await openAgentRoute(page, target);
+    await switchWorkspaceViaSidebar({
+      page,
+      serverId: getServerId(),
+      workspaceId: target.workspaceId,
+    });
     await expectComposerVisible(page);
     await subscriptions.waitForSubscribedAgents([
       target.agentId,
@@ -488,7 +499,9 @@ async function expectHiddenStreamingSubmissionOrderAfterWorkspaceEviction(
     await expect(promptRow).toBeVisible();
     await expect(response).toBeVisible();
     await expectRenderedBefore(promptRow, response);
-    expectOneResumeCheckWithoutTail(gate, requestsBeforeReturn);
+    // Open chats stay subscribed when their workspace view is evicted. Returning
+    // uses that live timeline without another resume check or startup tail fetch.
+    expect(rememberTimelineRequestCounts(gate, target.agentId)).toEqual(requestsBeforeReturn);
   } finally {
     gate.setAgentStreamSuppressed(false);
     gate.restore();
