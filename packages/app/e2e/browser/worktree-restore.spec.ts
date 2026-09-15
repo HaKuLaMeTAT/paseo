@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { archiveWorkspaceFromSidebar } from "../support/helpers/sidebar";
 import { rename } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { buildHostWorkspaceRoute } from "@/utils/host-routes";
@@ -137,6 +139,40 @@ test.describe("Worktree restore", () => {
     await client?.close().catch(() => undefined);
     await worktreeClient?.close().catch(() => undefined);
     await tempRepo?.cleanup().catch(() => undefined);
+  });
+
+  test("committed changes survive archive, restore and page reload", async ({ page }) => {
+    const worktree = await createWorktreeViaDaemon(worktreeClient, {
+      cwd: tempRepo.path,
+      slug: `restore-diff-${randomUUID().slice(0, 8)}`,
+    });
+    createdProjectIds.add(worktree.projectKey);
+    createdWorktreeDirectories.add(worktree.workspaceDirectory);
+    commitRestorableChange(worktree.workspaceDirectory);
+    const agent = await createIdleAgent(client, {
+      cwd: worktree.workspaceDirectory,
+      workspaceId: worktree.workspaceId,
+      title: "Restore committed changes",
+    });
+    const route = `${buildHostWorkspaceRoute(getServerId(), worktree.workspaceId)}?open=${encodeURIComponent(`agent:${agent.id}`)}`;
+
+    await page.goto(route);
+    await openChangesPanel(page);
+    await expectRestoredChangeInTree(page);
+    await archiveWorkspaceFromSidebar(page, worktree.workspaceId);
+    await expect.poll(() => existsSync(worktree.workspaceDirectory)).toBe(false);
+    await page.goto(route);
+    await restoreArchivedWorkspace(page);
+    await openChangesPanel(page);
+    await expectRestoredChangeInTree(page);
+    await page.reload();
+    await openChangesPanel(page);
+    await expectRestoredChangeInTree(page);
+    await openRestoredCommit(page);
+    await expect(
+      page.getByTestId("commit-diff-panel").filter({ visible: true }).getByTestId("diff-file-0"),
+    ).toHaveAccessibleName("restored-change.txt, +1, -0");
+    await page.screenshot({ path: test.info().outputPath("restored-commit.png") });
   });
 
   test("opening an active History agent navigates without restoring or unarchiving", async ({
@@ -387,3 +423,36 @@ test.describe("Worktree restore", () => {
     }
   });
 });
+
+function commitRestorableChange(cwd: string): void {
+  writeFileSync(path.join(cwd, "restored-change.txt"), "preserved after restore\n");
+  execFileSync("git", ["add", "restored-change.txt"], { cwd, stdio: "pipe" });
+  execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "-m", "Preserve restored diff"], {
+    cwd,
+    stdio: "pipe",
+  });
+}
+
+async function expectRestoredChangeInTree(page: Page): Promise<void> {
+  await expect(
+    page.getByText("restored-change.txt", { exact: true }).filter({ visible: true }),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByText("No changes to display", { exact: true }).filter({ visible: true }),
+  ).toHaveCount(0);
+}
+
+async function restoreArchivedWorkspace(page: Page): Promise<void> {
+  await expect(page.getByText("Workspace archived", { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole("button", { name: "Restore", exact: true }).click();
+  await expect(page.getByText("Workspace archived", { exact: true })).toHaveCount(0, {
+    timeout: 30_000,
+  });
+}
+
+async function openRestoredCommit(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /Commits/i }).click();
+  await page.getByText("Preserve restored diff", { exact: true }).click();
+}

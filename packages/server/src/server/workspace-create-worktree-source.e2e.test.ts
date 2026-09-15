@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test } from "vitest";
@@ -258,3 +258,132 @@ test("workspace.create suffixes an occupied checkout branch", async () => {
     rmSync(tempRoot, { recursive: true, force: true });
   }
 }, 180000);
+
+function runGit(cwd: string, ...args: string[]): string {
+  return execFileSync("git", args, { cwd, encoding: "utf8", stdio: "pipe" }).trim();
+}
+function commitFile(cwd: string, name: string, content: string): void {
+  writeFileSync(path.join(cwd, name), content);
+  runGit(cwd, "add", name);
+  runGit(cwd, "-c", "commit.gpgsign=false", "commit", "-m", name);
+}
+
+test.each(["refs/heads/main", "refs/remotes/origin/main", "refs/remotes/upstream/main"])(
+  "archive and restore preserves the committed diff and exact base %s",
+  async (baseRef) => {
+    const daemon = await createTestPaseoDaemon();
+    const { repoDir, tempRoot } = createGitRepoWithBranch();
+    const client = new DaemonClient({
+      url: `ws://127.0.0.1:${daemon.port}/ws`,
+      appVersion: "0.8.0",
+    });
+    try {
+      const root = runGit(repoDir, "rev-parse", "HEAD");
+      // Same displayed name, three different commit streams.
+      commitFile(repoDir, "local.txt", "local base\n");
+      runGit(repoDir, "switch", "--detach", root);
+      commitFile(repoDir, "origin.txt", "origin base\n");
+      runGit(repoDir, "update-ref", "refs/remotes/origin/main", "HEAD");
+      runGit(repoDir, "switch", "--detach", root);
+      commitFile(repoDir, "upstream.txt", "upstream base\n");
+      runGit(repoDir, "update-ref", "refs/remotes/upstream/main", "HEAD");
+      runGit(repoDir, "switch", "main");
+      await client.connect();
+      const created = await client.createWorkspace({
+        source: {
+          kind: "worktree",
+          cwd: repoDir,
+          action: "branch-off",
+          baseBranch: baseRef,
+          branchName: "feature/restore",
+          worktreeSlug: "restore-base",
+        },
+      });
+      expect(created.error).toBeNull();
+      const workspace = created.workspace!;
+      const cwd = workspace.workspaceDirectory;
+      commitFile(cwd, "feature.txt", "feature change\n");
+      const head = runGit(cwd, "rev-parse", "HEAD");
+      await client.checkoutRefresh(cwd);
+      const before = await client.getCheckoutDiff(cwd, { mode: "base", baseRef: "main" });
+      expect(before.error).toBeNull();
+      expect(before.files.map((file) => file.path)).toEqual(["feature.txt"]);
+      expect((await client.getCheckoutStatus(cwd)).baseRef).toBe("main");
+      const archived = await client.archiveWorkspace(workspace.id);
+      expect(archived.error).toBeNull();
+      expect(existsSync(cwd)).toBe(false);
+      expect(await client.inspectWorkspaceRecovery(workspace.id)).toMatchObject({
+        action: "restore",
+      });
+      await client.restoreWorkspace(workspace.id);
+      const restoredStatus = await client.getCheckoutStatus(cwd);
+      await client.checkoutRefresh(cwd);
+      const after = await client.getCheckoutDiff(cwd, {
+        mode: "base",
+        baseRef: restoredStatus.baseRef ?? undefined,
+      });
+      expect(after.error).toBeNull();
+      expect(after.files).toEqual(before.files);
+      expect(runGit(cwd, "rev-parse", "HEAD")).toBe(head);
+      expect(runGit(cwd, "branch", "--show-current")).toBe("feature/restore");
+      expect(await client.getCheckoutStatus(cwd)).toMatchObject({
+        baseRef: "main",
+        aheadBehind: { ahead: 1, behind: 0 },
+      });
+      const history = await client.listCheckoutCommits(cwd);
+      expect(history.baseRef).toBe(baseRef);
+      expect(
+        history.commits.filter((commit) => !commit.isOnBase).map((commit) => commit.sha),
+      ).toEqual([head]);
+      expect((await client.getCommitFileDiff(cwd, head, "feature.txt")).file?.path).toBe(
+        "feature.txt",
+      );
+      const records = JSON.parse(
+        readFileSync(path.join(daemon.paseoHome, "projects/workspaces.json"), "utf8"),
+      );
+      expect(
+        records.find((record: { workspaceId: string }) => record.workspaceId === workspace.id)
+          .baseBranch,
+      ).toBe(baseRef);
+      const conflicting =
+        baseRef === "refs/heads/main" ? "refs/remotes/origin/main" : "refs/heads/main";
+      expect(
+        (await client.getCheckoutDiff(cwd, { mode: "base", baseRef: conflicting })).error?.message,
+      ).toContain("Base ref mismatch");
+      // Advance only the chosen base; Update must not merge a same-named alternative.
+      runGit(repoDir, "switch", "--detach", baseRef);
+      commitFile(repoDir, "base-update.txt", `${baseRef}\n`);
+      const baseUpdate = runGit(repoDir, "rev-parse", "HEAD");
+      runGit(repoDir, "update-ref", baseRef, baseUpdate);
+      runGit(repoDir, "switch", "main");
+      await client.checkoutRefresh(cwd);
+      expect(await client.getCheckoutStatus(cwd)).toMatchObject({
+        aheadBehind: { ahead: 1, behind: 1 },
+      });
+      expect((await client.checkoutMergeFromBase(cwd, { baseRef: "main" })).error).toBeNull();
+      expect(readFileSync(path.join(cwd, "base-update.txt"), "utf8")).toBe(`${baseRef}\n`);
+      expect(runGit(cwd, "merge-base", baseUpdate, "HEAD")).toBe(baseUpdate);
+      expect(
+        (await client.getCheckoutDiff(cwd, { mode: "base", baseRef: "main" })).files.map(
+          (file) => file.path,
+        ),
+      ).toEqual(["feature.txt"]);
+      const merge = await client.checkoutMerge(cwd, {
+        baseRef: "main",
+        strategy: "merge",
+        requireCleanTarget: true,
+      });
+      if (baseRef === "refs/remotes/upstream/main") {
+        expect(merge.error?.message).toContain("No local merge target is recorded");
+      } else {
+        expect(merge.error).toBeNull();
+        expect(runGit(repoDir, "show", "main:feature.txt")).toBe("feature change");
+      }
+    } finally {
+      await client.close().catch(() => undefined);
+      await daemon.close();
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  },
+  180000,
+);

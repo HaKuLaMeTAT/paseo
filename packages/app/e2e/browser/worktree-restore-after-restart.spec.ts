@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { join } from "node:path";
+import { openChangesPanel } from "../support/helpers/branch-switcher";
 import { expect, type Page } from "@playwright/test";
 import { metroTest as test } from "../support/fixtures";
 import { gotoAppShell } from "../support/helpers/app";
@@ -80,7 +83,7 @@ test.describe("Worktree restore after daemon restart", () => {
     );
   }
 
-  test("after archiving a worktree and restarting the daemon, History shows the worktree branch (not main) before any restore", async ({
+  test("after archiving a worktree and restarting the daemon, History shows the worktree branch (not main) and restores its committed changes", async ({
     page,
   }) => {
     // A paseo worktree is cut on its own branch named after the slug, and the
@@ -96,6 +99,10 @@ test.describe("Worktree restore after daemon restart", () => {
     });
     createdProjectIds.add(worktree.projectKey);
     createdWorktreeDirectories.add(worktree.workspaceDirectory);
+
+    writeFileSync(join(worktree.workspaceDirectory, "restart-change.txt"), "persisted base\n");
+    execFileSync("git", ["add", "restart-change.txt"], { cwd: worktree.workspaceDirectory });
+    execFileSync("git", ["commit", "-m", "Survive restart"], { cwd: worktree.workspaceDirectory });
 
     const agent = await createMockIdleAgent(client, {
       cwd: worktree.workspaceDirectory,
@@ -138,5 +145,16 @@ test.describe("Worktree restore after daemon restart", () => {
     await expect(branchCell).toBeVisible({ timeout: 60_000 });
     await expect(branchCell).toHaveText(worktreeSlug, { timeout: 60_000 });
     await expect(workspaceCell).toHaveText(worktree.workspaceName, { timeout: 60_000 });
+    await page.getByTestId(`agent-row-${serverId}-${agent.id}`).click();
+    await page.getByRole("button", { name: "Restore", exact: true }).click();
+    await openChangesPanel(page);
+    await expect(
+      page.getByText("restart-change.txt", { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
+    await page.reload();
+    await openChangesPanel(page);
+    await expect(
+      page.getByText("restart-change.txt", { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
   });
 });
