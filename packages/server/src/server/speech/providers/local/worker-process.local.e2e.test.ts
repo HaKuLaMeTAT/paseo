@@ -161,6 +161,78 @@ workerSpeechTest(
   120_000,
 );
 
+test("delivers audio and serves control requests while later TTS is synthesizing", async () => {
+  const worker = forkWorker();
+  const messages: LocalSpeechWorkerToParentMessage[] = [];
+  let stderr = "";
+  worker.stderr?.on("data", (chunk) => {
+    stderr += String(chunk);
+  });
+  worker.on("message", (message: LocalSpeechWorkerToParentMessage) => messages.push(message));
+  const config: LocalSpeechWorkerConfig = {
+    modelsDir,
+    voiceSttModel: "parakeet-tdt-0.6b-v2-int8",
+    dictationSttModel: "parakeet-tdt-0.6b-v2-int8",
+    voiceTtsModel: "kokoro-en-v0_19",
+  };
+  try {
+    await sendRequest(
+      worker,
+      messages,
+      { type: "tts.synthesize", config, text: "Ready." },
+      () => stderr,
+    );
+    const completed: string[] = [];
+    const first = sendRequest(
+      worker,
+      messages,
+      {
+        type: "tts.synthesize",
+        config,
+        text: "I found the issue.",
+      },
+      () => stderr,
+    ).then(() => completed.push("first"));
+    const second = sendRequest(
+      worker,
+      messages,
+      {
+        type: "tts.synthesize",
+        config,
+        text: "The voice feature is slow because it waits for the whole sentence to finish generating before sending any audio to your phone, so I am checking whether we can start playback earlier while the rest is still being synthesized.",
+      },
+      () => stderr,
+    ).then(() => completed.push("second"));
+    await sendRequest(
+      worker,
+      messages,
+      {
+        type: "session.close",
+        sessionId: "responsiveness-probe",
+      },
+      () => stderr,
+    );
+    expect(completed).toEqual([]);
+    await first;
+    expect(completed).toEqual(["first"]);
+    await sendRequest(
+      worker,
+      messages,
+      {
+        type: "session.close",
+        sessionId: "responsiveness-probe",
+      },
+      () => stderr,
+    );
+    expect(completed).toEqual(["first"]);
+    await second;
+    expect(completed).toEqual(["first", "second"]);
+  } finally {
+    if (worker.connected) worker.disconnect();
+    if (!worker.killed) worker.kill();
+  }
+}, 120_000);
+
 type RequestInput = LocalSpeechWorkerRequest extends infer Request
   ? Request extends LocalSpeechWorkerRequest
     ? Omit<Request, "requestId">

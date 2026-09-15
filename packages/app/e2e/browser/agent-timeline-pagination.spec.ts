@@ -1,5 +1,9 @@
 import { expect, test } from "../support/fixtures";
+import { seedMockAgentWorkspace } from "../support/helpers/mock-agent";
 import {
+  spokenTimelinePrompt,
+  expectSpokenTimelinePrompt,
+  sendSpokenTimelinePrompt,
   expectStableHistoryStartGutter,
   expectTimelineAtHistoryStart,
   expectTimelinePromptCentered,
@@ -27,6 +31,39 @@ import {
 } from "../support/helpers/timeline-pagination";
 
 test.describe("Agent timeline pagination", () => {
+  test("shows spoken words without voice instructions in history, live updates and after reload", async ({
+    page,
+  }, testInfo) => {
+    const historyText = "Please check the voice history.";
+    const liveText = "Now check the live voice message.";
+    const agent = await seedMockAgentWorkspace({
+      repoPrefix: "spoken-timeline-",
+      title: "Spoken timeline presentation",
+      initialPrompt: spokenTimelinePrompt(historyText),
+    });
+    try {
+      await agent.client.waitForFinish(agent.agentId, 15_000);
+      await openAgentTimeline(page, agent);
+      await expectSpokenTimelinePrompt(page, historyText);
+      await sendSpokenTimelinePrompt(agent, liveText);
+      await expectSpokenTimelinePrompt(page, liveText);
+      await testInfo.attach("spoken-live-desktop-web", {
+        body: await page.screenshot({ path: testInfo.outputPath("spoken-desktop-web.png") }),
+        contentType: "image/png",
+      });
+      await page.reload();
+      await expectSpokenTimelinePrompt(page, liveText);
+      await page.setViewportSize({ width: 390, height: 844 });
+      await expectSpokenTimelinePrompt(page, liveText);
+      await testInfo.attach("spoken-reloaded-compact-web", {
+        body: await page.screenshot({ path: testInfo.outputPath("spoken-compact-web.png") }),
+        contentType: "image/png",
+      });
+    } finally {
+      await agent.cleanup();
+    }
+  });
+
   test("keeps the history-start gutter and visible position stable through the final page", async ({
     page,
   }) => {
