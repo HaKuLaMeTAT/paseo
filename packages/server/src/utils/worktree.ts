@@ -1316,9 +1316,7 @@ async function resolveRestoredWorktreeSourcePlan(
   source: Extract<WorktreeSource, { kind: "restore" }>,
 ): Promise<WorktreeSourcePlan> {
   await validateGitBranchName(cwd, source.branchName);
-  if (!(await localBranchExists(cwd, source.branchName))) {
-    throw new UnknownBranchError({ branchName: source.branchName, cwd });
-  }
+  await ensureLocalBranch(cwd, source.branchName);
   if (await isBranchCheckedOut(cwd, source.branchName)) {
     throw new BranchAlreadyCheckedOutError(source.branchName);
   }
@@ -1377,16 +1375,7 @@ async function resolveWorktreeSourcePlan({
       return resolveRestoredWorktreeSourcePlan(cwd, source);
     case "checkout-branch": {
       await validateGitBranchName(cwd, source.branchName);
-      if (!(await localBranchExists(cwd, source.branchName))) {
-        try {
-          await runGitCommand(["fetch", "origin", `${source.branchName}:${source.branchName}`], {
-            cwd,
-            timeout: 120_000,
-          });
-        } catch {
-          throw new UnknownBranchError({ branchName: source.branchName, cwd });
-        }
-      }
+      await ensureLocalBranch(cwd, source.branchName);
       if (await isBranchCheckedOut(cwd, source.branchName)) {
         const branchName = await resolveUniqueLocalBranchName(cwd, source.branchName);
         return {
@@ -1675,7 +1664,7 @@ async function resolveBaseBranchForWorktree(
       await runGitCommand(["rev-parse", "--verify", exactRef], { cwd });
       return exactRef;
     } catch {
-      throw new Error(`Base branch not found: ${normalized}`);
+      throw new Error(`Base branch not found: ${exactRef}`);
     }
   }
 
@@ -1689,6 +1678,20 @@ async function resolveBaseBranchForWorktree(
     }
   }
   throw new Error(`Base branch not found: ${normalized}`);
+}
+
+async function ensureLocalBranch(cwd: string, branchName: string): Promise<void> {
+  if (await localBranchExists(cwd, branchName)) {
+    return;
+  }
+  try {
+    await runGitCommand(["fetch", "origin", `${branchName}:${branchName}`], {
+      cwd,
+      timeout: 120_000,
+    });
+  } catch {
+    throw new UnknownBranchError({ branchName, cwd });
+  }
 }
 
 async function localBranchExists(cwd: string, branchName: string): Promise<boolean> {

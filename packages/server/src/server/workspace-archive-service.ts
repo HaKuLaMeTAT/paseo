@@ -603,15 +603,14 @@ export async function archivePersistedWorkspaceRecord(input: {
     return existingWorkspace;
   }
 
-  // COMPAT(workspaceBaseRef): added in v0.8.0, remove after 2027-09-15.
+  // COMPAT(workspaceBaseRef): added after v0.8.0, remove after 2027-09-15.
   // Preserve the exact base of pre-existing workspaces before Git deletes their metadata.
   if (
-    existingWorkspace.baseBranch &&
-    !existingWorkspace.baseBranch.startsWith("refs/") &&
+    !existingWorkspace.baseBranch?.startsWith("refs/") &&
     existingWorkspace.worktreeRoot &&
     existsSync(join(existingWorkspace.worktreeRoot, ".git"))
   ) {
-    const baseRef = readPaseoWorktreeMetadata(existingWorkspace.worktreeRoot)?.baseRef;
+    const baseRef = readBaseBeforeArchive(existingWorkspace, existingWorkspace.worktreeRoot);
     if (baseRef) {
       await input.workspaceRegistry.update(input.workspaceId, (workspace) => ({
         ...workspace,
@@ -624,4 +623,23 @@ export async function archivePersistedWorkspaceRecord(input: {
   await input.workspaceRegistry.archive(input.workspaceId, archivedAt, input.context);
 
   return existingWorkspace;
+}
+
+function readBaseBeforeArchive(
+  workspace: PersistedWorkspaceRecord,
+  worktreeRoot: string,
+): string | null {
+  try {
+    const metadata = readPaseoWorktreeMetadata(worktreeRoot);
+    if (metadata?.baseRef) {
+      return metadata.baseRef;
+    }
+    if (workspace.baseBranch === null && metadata && metadata.baseRefName !== workspace.branch) {
+      return metadata.baseRefName;
+    }
+  } catch {
+    // Optional legacy backfill must not prevent archiving an unreadable worktree.
+    // Retain the saved base when metadata cannot be recovered.
+  }
+  return null;
 }
