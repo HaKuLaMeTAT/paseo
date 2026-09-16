@@ -86,9 +86,8 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DesktopPermissionsSection } from "@/desktop/components/desktop-permissions-section";
 import { DesktopNotificationsSection } from "@/desktop/components/desktop-notifications-section";
-import { BrowserDataSection } from "@/desktop/browser/settings/browser-data-section";
 import { IntegrationsSection } from "@/desktop/components/integrations-section";
-import { isElectronRuntime } from "@/desktop/host";
+import { isElectronRuntime, supportsEmbeddedBrowser } from "@/desktop/host";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
 import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
 import { resolveAppVersion } from "@/utils/app-version";
@@ -459,7 +458,7 @@ function GeneralSection({
             </DropdownMenuContent>
           </DropdownMenu>
         </View>
-        {isDesktopApp ? (
+        {isDesktopApp && supportsEmbeddedBrowser() ? (
           <View style={[settingsStyles.row, settingsStyles.rowBorder]}>
             <View style={settingsStyles.rowContent}>
               <Text style={settingsStyles.rowTitle}>{t("settings.general.serviceUrls.label")}</Text>
@@ -1523,17 +1522,14 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
         switch (view.section) {
           case "general":
             return (
-              <>
-                <GeneralSection
-                  settings={settings}
-                  isDesktopApp={isDesktopApp}
-                  handleSendBehaviorChange={handleSendBehaviorChange}
-                  handleServiceUrlBehaviorChange={handleServiceUrlBehaviorChange}
-                  handleLanguageChange={handleLanguageChange}
-                  handleTerminalScrollbackLinesChange={handleTerminalScrollbackLinesChange}
-                />
-                {isDesktopApp ? <BrowserDataSection /> : null}
-              </>
+              <GeneralSection
+                settings={settings}
+                isDesktopApp={isDesktopApp}
+                handleSendBehaviorChange={handleSendBehaviorChange}
+                handleServiceUrlBehaviorChange={handleServiceUrlBehaviorChange}
+                handleLanguageChange={handleLanguageChange}
+                handleTerminalScrollbackLinesChange={handleTerminalScrollbackLinesChange}
+              />
             );
           case "appearance":
             return <AppearanceSection />;

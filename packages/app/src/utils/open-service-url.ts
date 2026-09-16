@@ -1,4 +1,4 @@
-import { getDesktopHost, isElectronRuntime } from "@/desktop/host";
+import { getDesktopHost, supportsEmbeddedBrowser } from "@/desktop/host";
 import {
   loadAppSettingsFromStorage,
   persistAppSettings,
@@ -13,7 +13,7 @@ export interface OpenServiceUrlOptions {
 
 export async function openServiceUrl(url: string, options?: OpenServiceUrlOptions): Promise<void> {
   const openInApp = options?.openInApp;
-  if (!openInApp || !isElectronRuntime()) {
+  if (!openInApp || !supportsEmbeddedBrowser()) {
     await openExternalUrl(url);
     return;
   }

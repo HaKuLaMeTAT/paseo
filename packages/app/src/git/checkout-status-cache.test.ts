@@ -1,5 +1,10 @@
+import { usePrPaneData } from "./pull-request-panel/use-data";
 // @vitest-environment jsdom
-import { QueryClient } from "@tanstack/react-query";
+import { createElement } from "react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { useCheckoutStatusQuery } from "./use-status-query";
+import { useCheckoutPrStatusQuery, useWorkspacePrHint } from "./use-pr-status-query";
+import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CheckoutStatusUpdate } from "@getpaseo/protocol/messages";
 import {
@@ -32,6 +37,22 @@ vi.mock("@react-native-async-storage/async-storage", () => ({
   },
 }));
 
+const panel = vi.hoisted(() => ({
+  active: true,
+  getCheckoutStatus: vi.fn(),
+  checkoutPrStatus: vi.fn(),
+  pullRequestTimeline: vi.fn(),
+}));
+vi.mock("@/components/retained-panel", () => ({ useRetainedPanelActive: () => panel.active }));
+vi.mock("@/runtime/host-runtime", () => ({
+  useHostRuntimeClient: () => panel,
+  useHostRuntimeIsConnected: () => true,
+}));
+vi.mock("react-i18next", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react-i18next")>()),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
 const serverId = "server-1";
 const cwd = "/repo";
 
@@ -60,6 +81,9 @@ function prStatus(overrides: Partial<CheckoutPrStatusPayload> = {}): CheckoutPrS
     cwd,
     status: {
       forge: "github",
+      number: 42,
+      repoOwner: "getpaseo",
+      repoName: "paseo",
       url: "https://github.com/getpaseo/paseo/pull/42",
       title: "My PR",
       state: "open",
@@ -336,5 +360,56 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
     expect(queryClient.getQueryState(otherTimelineKey)?.isInvalidated).toBe(false);
     expect(queryClient.getQueryState(pipelineKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(otherPipelineKey)?.isInvalidated).toBe(false);
+  });
+});
+
+describe("retained Git panel queries", () => {
+  it("pauses hidden status and PR queries and refreshes on reactivation", async () => {
+    panel.active = true;
+    panel.getCheckoutStatus.mockReset().mockResolvedValue(checkoutStatus());
+    panel.checkoutPrStatus.mockReset().mockResolvedValue(prStatus());
+    panel.pullRequestTimeline.mockReset().mockResolvedValue({ pullRequest: null, events: [] });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+    });
+    const wrapper = ({ children }: { children: import("react").ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+    const hook = renderHook(
+      () => {
+        useCheckoutStatusQuery({ serverId, cwd });
+        useCheckoutPrStatusQuery({ serverId, cwd });
+        useWorkspacePrHint({ serverId, cwd });
+        usePrPaneData({ serverId, cwd });
+      },
+      { wrapper },
+    );
+    try {
+      await waitFor(() => expect(panel.getCheckoutStatus).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(panel.checkoutPrStatus).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(panel.pullRequestTimeline).toHaveBeenCalledTimes(1));
+      panel.active = false;
+      hook.rerender();
+      await act(async () => {
+        await queryClient.invalidateQueries();
+      });
+      expect(panel.getCheckoutStatus).toHaveBeenCalledTimes(1);
+      expect(panel.checkoutPrStatus).toHaveBeenCalledTimes(1);
+      expect(panel.pullRequestTimeline).toHaveBeenCalledTimes(1);
+      panel.active = true;
+      hook.rerender();
+      await waitFor(() => expect(panel.getCheckoutStatus).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(panel.checkoutPrStatus).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(panel.pullRequestTimeline).toHaveBeenCalledTimes(2));
+      panel.active = false;
+      hook.rerender();
+      panel.active = true;
+      hook.rerender();
+      await waitFor(() => expect(panel.getCheckoutStatus).toHaveBeenCalledTimes(3));
+      await waitFor(() => expect(panel.checkoutPrStatus).toHaveBeenCalledTimes(3));
+    } finally {
+      hook.unmount();
+      queryClient.clear();
+      panel.active = true;
+    }
   });
 });

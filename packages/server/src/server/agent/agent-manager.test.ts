@@ -4606,9 +4606,10 @@ test("setTitle bumps updatedAt and persists title in the same snapshot write", a
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-set-title-updated-at-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);
+  const renameNativeSession = vi.fn().mockResolvedValue(undefined);
   const manager = new AgentManager({
     clients: {
-      codex: new TestAgentClient(),
+      codex: Object.assign(new TestAgentClient(), { renameNativeSession }),
     },
     registry: storage,
     logger,
@@ -4629,6 +4630,14 @@ test("setTitle bumps updatedAt and persists title in the same snapshot write", a
 
   await manager.setTitle(snapshot.id, "Generated title");
 
+  expect(renameNativeSession).toHaveBeenCalledWith(
+    expect.objectContaining({ provider: "codex" }),
+    "Generated title",
+  );
+  renameNativeSession.mockRejectedValueOnce(new Error("Native rename failed"));
+  await expect(manager.setTitle(snapshot.id, "Rejected title")).rejects.toThrow(
+    "Native rename failed",
+  );
   const after = await storage.get(snapshot.id);
   expect(after?.title).toBe("Generated title");
   expect(Date.parse(after!.updatedAt)).toBeGreaterThan(Date.parse(before!.updatedAt));
@@ -4642,9 +4651,10 @@ test("updateAgentMetadata bumps updatedAt for stored agents", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-stored-metadata-updated-at-"));
   const storagePath = join(workdir, "agents");
   const storage = new AgentStorage(storagePath, logger);
+  const renameNativeSession = vi.fn().mockResolvedValue(undefined);
   const manager = new AgentManager({
     clients: {
-      codex: new TestAgentClient(),
+      codex: Object.assign(new TestAgentClient(), { renameNativeSession }),
     },
     registry: storage,
     logger,
@@ -4674,6 +4684,11 @@ test("updateAgentMetadata bumps updatedAt for stored agents", async () => {
     labels: { role: "worker" },
   });
 
+  expect(renameNativeSession).toHaveBeenCalledWith(
+    expect.objectContaining({ provider: "codex" }),
+    "Stored title",
+  );
+  expect(manager.getAgent(snapshot.id)).toBeNull();
   expect(upsertSpy).toHaveBeenCalledTimes(1);
   const after = await storage.get(snapshot.id);
   expect(after?.title).toBe("Stored title");

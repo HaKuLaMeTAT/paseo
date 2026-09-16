@@ -222,6 +222,8 @@ export const en = {
     },
   },
   agentStream: {
+    expandProcess: "Expand turn activity",
+    collapseProcess: "Collapse turn activity",
     empty: "Start chatting with this agent...",
     scrollToBottom: "Scroll to bottom",
     historyLoadFailed: "Couldn't load agent history",

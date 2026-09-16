@@ -47,6 +47,17 @@ import {
 } from "./auto-updater";
 
 describe("checkForAppUpdate", () => {
+  it("does not query upstream for a custom Lite build", async () => {
+    const calls = autoUpdaterMock.checkForUpdates.mock.calls.length;
+    const result = await checkForAppUpdate({
+      currentVersion: "0.8.0-lite.1",
+      releaseChannel: "stable",
+      intent: "manual",
+    });
+    expect(result.hasUpdate).toBe(false);
+    expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(calls);
+  });
+
   it("treats an unpublished channel manifest as an unavailable update", async () => {
     const error = Object.assign(new Error("Cannot find latest-mac.yml"), {
       code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",

@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { PASEO_BROWSER_PROFILE_PARTITION } from "./features/browser-profile.js";
+import { runInNewContext } from "node:vm";
 
 // The preload runs inside Electron's sandbox and is tsc-compiled (not bundled), so at
 // runtime it may only load Electron's sandbox allowlist. Any other module (local or
@@ -87,13 +87,27 @@ describe("preload sandbox safety", () => {
     expect(disallowed).toEqual([]);
   });
 
-  it("inlines the browser profile partition instead of importing it", () => {
-    const source = readFileSync(preloadPath, "utf8");
-    const match = source.match(/const\s+PASEO_BROWSER_PROFILE_PARTITION\s*=\s*"([^"]+)"/);
-    expect(
-      match,
-      "PASEO_BROWSER_PROFILE_PARTITION not found as a double-quoted string literal in preload.ts",
-    ).not.toBeNull();
-    expect(match![1]).toBe(PASEO_BROWSER_PROFILE_PARTITION);
+  it("keeps desktop controls without exposing embedded browser or automation", () => {
+    let exposed: unknown;
+    const source = ts.transpileModule(readFileSync(preloadPath, "utf8"), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText;
+    runInNewContext(source, {
+      exports: {},
+      process: { argv: [], platform: "win32" },
+      require: () => ({
+        contextBridge: {
+          exposeInMainWorld: (_name: string, value: unknown) => {
+            exposed = value;
+          },
+        },
+        ipcRenderer: {},
+        webUtils: {},
+      }),
+    });
+    expect(exposed).not.toHaveProperty("browser");
+    expect(exposed).toHaveProperty("window.getCurrentWindow");
+    expect(exposed).toHaveProperty("notification.sendNotification");
+    expect(exposed).toHaveProperty("invoke");
   });
 });

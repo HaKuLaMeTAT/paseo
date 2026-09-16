@@ -91,7 +91,10 @@ export class ScheduleStore {
   private readonly scheduleMutations = new Map<string, Promise<unknown>>();
   private readonly identityMutations = new Map<string, Promise<unknown>>();
 
-  constructor(private readonly dir: string) {}
+  constructor(
+    private readonly dir: string,
+    private readonly onChange?: (id: string, schedule: StoredSchedule | null) => void,
+  ) {}
 
   private filePath(id: string): string {
     return join(this.dir, `${id}.json`);
@@ -187,12 +190,14 @@ export class ScheduleStore {
   private async write(schedule: StoredSchedule): Promise<void> {
     await this.ensureDir();
     await writeJsonFileAtomic(this.filePath(schedule.id), schedule);
+    this.onChange?.(schedule.id, schedule);
   }
 
   async delete(id: string): Promise<void> {
     await this.serializeScheduleMutation(id, async () => {
       await this.ensureDir();
       await rm(this.filePath(id), { force: true });
+      this.onChange?.(id, null);
     });
   }
 

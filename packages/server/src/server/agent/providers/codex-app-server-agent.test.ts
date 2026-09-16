@@ -1537,6 +1537,26 @@ describe("Codex app-server provider", () => {
     appServer.assertNoErrors();
   });
 
+  test("renames the native thread without starting an interactive turn", async () => {
+    const requests: unknown[] = [];
+    const appServer = createFakeCodexAppServer({
+      "thread/name/set": (params) => {
+        requests.push(params);
+        return {};
+      },
+    });
+    const provider = new CodexAppServerAgentClient(createTestLogger());
+    castInternals<{ spawnAppServer: () => Promise<ChildProcessWithoutNullStreams> }>(
+      provider,
+    ).spawnAppServer = async () => appServer.child;
+    await provider.renameNativeSession(
+      { provider: "codex", sessionId: "persisted-id", nativeHandle: "native-id" },
+      "修复登录",
+    );
+    expect(requests).toEqual([{ threadId: "native-id", name: "修复登录" }]);
+    appServer.assertNoErrors();
+  });
+
   test("archives the persisted native thread without opening an interactive session", async () => {
     const threadRequests: Array<{ method: string; params: unknown }> = [];
     const appServer = createFakeCodexAppServer({

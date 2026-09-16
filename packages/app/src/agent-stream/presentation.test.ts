@@ -10,6 +10,7 @@ import {
   type ToolCallItem,
 } from "@/types/stream";
 import { transformTimelineItem, type TimelineItemTransform } from "@/plugins/timeline/model";
+import { collapseCompletedProcesses } from "./completed-process";
 import { createStreamPresentation } from "./presentation";
 
 const runtime = {
@@ -348,4 +349,36 @@ describe("stream presentation through installed plugins", () => {
       { text: sourceText, phase: "streaming" },
     ]);
   });
+});
+
+it("collapses a completed response while keeping every final-answer block and allowing expansion", () => {
+  const timestamp = new Date();
+  const items: StreamItem[] = [
+    { kind: "assistant_message", id: "progress", text: "Working", timestamp },
+    { kind: "assistant_message", id: "progress-2", text: "Checking", timestamp },
+    { kind: "assistant_message", id: "final:0", blockGroupId: "final", text: "Result", timestamp },
+    { kind: "assistant_message", id: "final:1", blockGroupId: "final", text: "Details", timestamp },
+  ];
+  expect(collapseCompletedProcesses(items, true, new Set()).groups.size).toBe(0);
+  const collapsed = collapseCompletedProcesses(items, false, new Set());
+  expect(collapsed.items.map((item) => item.id)).toEqual(["progress", "final:0", "final:1"]);
+  expect(collapsed.groups.has("progress")).toBe(true);
+  expect(collapseCompletedProcesses(items, false, new Set(["progress"])).items).toBe(items);
+  expect(collapseCompletedProcesses(items.slice(2), false, new Set()).groups.size).toBe(0);
+});
+
+it("keeps the active response open while collapsing earlier responses", () => {
+  const timestamp = new Date();
+  const items: StreamItem[] = [
+    { kind: "user_message", id: "u1", text: "First", timestamp },
+    { kind: "assistant_message", id: "p1", text: "Working", timestamp },
+    { kind: "assistant_message", id: "p2", text: "Checking", timestamp },
+    { kind: "assistant_message", id: "a1", text: "Done", timestamp },
+    { kind: "user_message", id: "u2", text: "Next", timestamp },
+    { kind: "assistant_message", id: "p3", text: "Working again", timestamp },
+    { kind: "assistant_message", id: "p4", text: "Still working", timestamp },
+  ];
+  const result = collapseCompletedProcesses(items, true, new Set());
+  expect(result.items.map((item) => item.id)).toEqual(["u1", "p1", "a1", "u2", "p3", "p4"]);
+  expect([...result.groups.keys()]).toEqual(["p1"]);
 });

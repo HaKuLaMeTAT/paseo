@@ -59,7 +59,8 @@ function buildHarness(opts: { emitCwdRejects?: boolean } = {}) {
   const warnCalls: unknown[][] = [];
 
   const workspaceGitService: Pick<WorkspaceGitService, "registerWorkspace"> = {
-    registerWorkspace({ cwd }, listener) {
+    registerWorkspace({ cwd, watchWorkingTree }, listener) {
+      expect(watchWorkingTree).toBe(false);
       registerCalls.push(cwd);
       listeners.set(cwd, listener);
       return {

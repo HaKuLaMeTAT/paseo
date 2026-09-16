@@ -94,3 +94,11 @@ describe("Built-in light theme", () => {
     });
   });
 });
+
+it("uses a warm light Claude theme including code and terminal surfaces", () => {
+  const option = THEME_OPTIONS.find((entry) => entry.name === "claude")!;
+  expect(option.theme.colorScheme).toBe("light");
+  expect(option.theme.colors.surface0).toBe("#faf9f5");
+  expect(option.theme.colors.terminal.background).toBe("#faf9f5");
+  expect(option.theme.colors.syntax).toEqual(lightTheme.colors.syntax);
+});

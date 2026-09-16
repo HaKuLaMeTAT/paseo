@@ -1,5 +1,7 @@
 # Development
 
+For the isolated Windows shell experiment, see [windows-desktop-evaluation.md](windows-desktop-evaluation.md).
+
 ## Prerequisites
 
 - Node.js (see `.tool-versions` for exact version)

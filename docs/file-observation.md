@@ -14,7 +14,11 @@ Windows and macOS use one native recursive watcher plus an ignored-pruned, direc
 
 Read aggregate health from the owning observer service. Runtime metrics include active observations, native handles, tracked native files, pending events and immediate reconciliation work, scoped and full reconciliation activity and latency, and failure counts. Delayed safety audits do not count as pending work. Closing the service releases every subscription and clears its diagnostics. Do not add path lists, watcher handles, or platform-specific controls to this interface.
 
+Workspace cards retain repository metadata observation without retaining a recursive working-tree observation. Use `registerWorkspace({ cwd, watchWorkingTree: false }, listener)` for this demand; the default registration retains both. A diff or independent file subscription acquires the working-tree observation and releases its own reference on close. Keep metadata subscriptions alive across that release so branch and worktree identity continue to update. A late recursive setup must close if its last demand disappeared while awaiting I/O. Reopening a diff performs a fresh read because edits made while observation was released cannot invalidate its cache.
+
 Git owns Git-ignore evaluation. The observer accepts absolute excluded roots and applies updates without replacing the observation or exposing its watcher topology. This keeps tracked files inside otherwise ignored directories observable and keeps Git policy out of the filesystem module.
+
+Healthy workspace observation does not need a periodic setup check. Retry incomplete setup after a bounded delay and cancel the retry when setup succeeds or the last subscriber leaves. Keep watcher-specific degraded polling and recovery independent of this setup retry.
 
 Workspace Git verifies each repository metadata subscription with a one-shot canary inside the Git directory. If the event does not round-trip through the subscription callback, treat the watcher as unavailable and enter degraded polling. Refresh working-tree Git-ignore exclusions from ignore-file events and watcher recovery, never from a healthy-watcher timer.
 

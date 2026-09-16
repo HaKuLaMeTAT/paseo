@@ -313,6 +313,40 @@ describe("ScheduleService", () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  test("runs the timer only while active schedules exist", async () => {
+    const service = createScheduleService({
+      paseoHome: tempDir,
+      logger: createTestLogger(),
+      agentManager: new AgentManager({ logger: createTestLogger() }),
+      agentStorage,
+      providerSnapshotManager: NO_UNATTENDED_SCHEDULE_POLICY,
+      now: () => now,
+      runner: async () => ({ agentId: "00000000-0000-0000-0000-000000000001", output: "done" }),
+    });
+    vi.useFakeTimers();
+    try {
+      const baseline = vi.getTimerCount();
+      await service.start();
+      expect(vi.getTimerCount()).toBe(baseline);
+      const schedule = await service.create({
+        prompt: "check",
+        cadence: { type: "every", everyMs: 60_000 },
+        target: { type: "new-agent", config: { provider: "claude", cwd: tempDir } },
+      });
+      expect(vi.getTimerCount()).toBe(baseline + 1);
+      await service.pause(schedule.id);
+      expect(vi.getTimerCount()).toBe(baseline);
+      await service.resume(schedule.id);
+      expect(vi.getTimerCount()).toBe(baseline + 1);
+      await service.delete(schedule.id);
+      expect(vi.getTimerCount()).toBe(baseline);
+      await service.stop();
+    } finally {
+      await service.stop();
+      vi.useRealTimers();
+    }
+  });
+
   test("ticks due schedules and records run history on disk", async () => {
     const service = createScheduleService({
       paseoHome: tempDir,

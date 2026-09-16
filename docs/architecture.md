@@ -4,6 +4,9 @@ Paseo is a client-server system for monitoring and controlling local AI coding a
 
 Your code never leaves your machine. Paseo is local-first.
 
+Local customization scope is tracked in [customization-plan.md](customization-plan.md).
+The bounded shell experiment is documented in [windows-desktop-evaluation.md](windows-desktop-evaluation.md).
+
 ## System overview
 
 ```

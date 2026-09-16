@@ -109,6 +109,8 @@ export class CheckoutDiffManager {
         target.latestPayload ??
         (await this.computeCheckoutDiffSnapshot(target.cwd, target.compare, {
           diffCwd: target.diffCwd,
+          force: true,
+          reason: "checkout-diff-open",
         }));
       target.latestPayload = initial;
       target.latestFingerprint = JSON.stringify(initial);

@@ -501,26 +501,6 @@ const midnightDarkColors = buildDarkSemanticColors({
   terminalBrightBlack: "#3c3e4c",
 });
 
-// Claude — warm neutral with subtle orange undertone
-const claudeDarkColors = buildDarkSemanticColors({
-  surface0: "#1f1f1e",
-  surface1: "#262523",
-  surface2: "#2f2d2b",
-  surface3: "#4a4745",
-  surface4: "#605d5b",
-  surfaceDiffEmpty: "#2a2826",
-  surfaceSidebar: "#1a1918",
-  foregroundMuted: "#ada9a5",
-  foregroundExtraMuted: "#78746f",
-  border: "#2c2a27",
-  borderAccent: "#36332f",
-  accent: "#d97757",
-  accentBright: "#e89a7f",
-  destructive: "#cf513e", // warm orange-red, hue ~10 — sits with the Claude orange accent
-  terminalBlack: "#1a1918",
-  terminalBrightBlack: "#4a4745",
-});
-
 // Ghostty — blue-tinted dark based on Ghostty default background
 const ghosttyDarkColors = buildDarkSemanticColors({
   surface0: "#282c34",
@@ -691,7 +671,6 @@ export function buildDarkTheme(semanticColors: ReturnType<typeof buildDarkSemant
 export const darkTheme = buildDarkTheme(paseoDarkColors);
 export const darkZincTheme = buildDarkTheme(zincDarkColors);
 export const darkMidnightTheme = buildDarkTheme(midnightDarkColors);
-export const darkClaudeTheme = buildDarkTheme(claudeDarkColors);
 export const darkGhosttyTheme = buildDarkTheme(ghosttyDarkColors);
 
 // Pure black — zero-luminance background with high-contrast surfaces.
@@ -752,6 +731,32 @@ export function buildLightTheme(semanticColors: ReturnType<typeof buildLightSema
 
 export const lightTheme = buildLightTheme(lightSemanticColors);
 
+export const lightClaudeTheme = buildLightTheme(
+  buildLightSemanticColors({
+    surface0: "#faf9f5",
+    surface1: "#f5f3ed",
+    surface2: "#eeece4",
+    surface3: "#e5e1d7",
+    surface4: "#d6d1c4",
+    surfaceDiffEmpty: "#f0eee7",
+    surfaceSidebar: "#f0eee6",
+    foreground: "#292721",
+    foregroundMuted: "#6b665b",
+    foregroundExtraMuted: "#80796c",
+    border: "#ded9cd",
+    borderAccent: "#cec6b6",
+    accent: "#a84f35",
+    accentBright: "#c26445",
+    accentForeground: "#ffffff",
+    primary: "#292721",
+    primaryForeground: "#faf9f5",
+    destructive: "#b04138",
+    terminalBlack: "#292721",
+    terminalBrightBlack: "#6b665b",
+    ring: "#a84f35",
+  }),
+);
+
 // Keep compatibility with existing code
 export const theme = darkTheme;
 
@@ -788,8 +793,8 @@ export const THEME_OPTIONS = [
   {
     name: "claude",
     group: "variant",
-    unistylesName: "darkClaude",
-    theme: darkClaudeTheme,
+    unistylesName: "lightClaude",
+    theme: lightClaudeTheme,
     swatch: "#D97757",
   },
   {

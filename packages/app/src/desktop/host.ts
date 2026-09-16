@@ -202,6 +202,10 @@ export function getDesktopHost(): DesktopHostBridge | null {
   return getElectronHost();
 }
 
+export function supportsEmbeddedBrowser(): boolean {
+  return typeof getDesktopHost()?.browser?.registerAttachedBrowser === "function";
+}
+
 export function isElectronRuntime(): boolean {
   return getDesktopHost() !== null;
 }

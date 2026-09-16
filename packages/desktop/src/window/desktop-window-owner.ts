@@ -12,6 +12,8 @@ export interface OwnedDesktopWindow<TAgentTarget> {
 }
 
 interface DesktopWindowOwnerPort<TAgentTarget> {
+  singleWindow?: boolean;
+  reloadWindow?: (webContentsId: number) => void;
   create(input: {
     initialRoute: string | null;
     restoreWindowState: boolean;
@@ -39,6 +41,7 @@ export function createDesktopWindowOwner<TAgentTarget>(
   port: DesktopWindowOwnerPort<TAgentTarget>,
 ): DesktopWindowOwner<TAgentTarget> {
   const pendingProjects = new PendingOpenProjectStore();
+  let windowCreation: Promise<unknown> | null = null;
   let agentWindowCreation: Promise<void> | null = null;
 
   const open = async (input: {
@@ -46,12 +49,35 @@ export function createDesktopWindowOwner<TAgentTarget>(
     pendingProjectPath: string | null;
     restoreWindowState: boolean;
   }): Promise<void> => {
-    await port.create({
+    if (port.singleWindow) {
+      if (windowCreation) {
+        await windowCreation;
+        return open(input);
+      }
+      const existing = port.windows().find((window) => !window.isDestroyed());
+      if (existing) {
+        if (input.pendingProjectPath) {
+          pendingProjects.set(existing.webContentsId, input.pendingProjectPath);
+          port.reloadWindow?.(existing.webContentsId);
+        }
+        if (existing.isMinimized()) existing.restore();
+        existing.show();
+        existing.focus();
+        return;
+      }
+    }
+    const creation = port.create({
       initialRoute: input.initialRoute,
       restoreWindowState: input.restoreWindowState,
       onCreated: (webContentsId) => pendingProjects.set(webContentsId, input.pendingProjectPath),
       onClosed: (webContentsId) => pendingProjects.delete(webContentsId),
     });
+    windowCreation = creation;
+    try {
+      await creation;
+    } finally {
+      if (windowCreation === creation) windowCreation = null;
+    }
   };
 
   const owner: DesktopWindowOwner<TAgentTarget> = {

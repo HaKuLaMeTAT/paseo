@@ -7267,6 +7267,19 @@ export class CodexAppServerAgentClient implements AgentClient {
     }
   }
 
+  async renameNativeSession(handle: AgentPersistenceHandle, title: string): Promise<void> {
+    const threadId = handle.nativeHandle ?? handle.sessionId;
+    if (!threadId) throw new Error("Cannot rename Codex session without a native thread ID");
+    const client = new CodexAppServerClient(await this.spawnAppServer(), this.logger);
+    try {
+      await client.request("initialize", buildCodexAppServerInitializeParams());
+      client.notify("initialized", {});
+      await client.request("thread/name/set", { threadId, name: title });
+    } finally {
+      await client.dispose();
+    }
+  }
+
   async archiveNativeSession(handle: AgentPersistenceHandle): Promise<void> {
     await this.updateNativeThreadArchiveState(handle, "archive");
   }

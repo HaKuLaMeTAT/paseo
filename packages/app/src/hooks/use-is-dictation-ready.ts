@@ -1,3 +1,4 @@
+import { isWeb } from "@/constants/platform";
 import { useCallback } from "react";
 
 import type { HostRuntimeAgentDirectoryStatus } from "@/runtime/host-runtime";
@@ -36,7 +37,7 @@ export function useIsDictationReady({
     ),
   );
 
-  if (!isConnected) {
+  if (isWeb || !isConnected) {
     return false;
   }
 

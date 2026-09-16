@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { applyLightweightProfile } from "./lightweight-profile.js";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -203,7 +204,7 @@ describe("desktop-settings", () => {
     expect(persisted).toBe(raw);
   });
 
-  it("resets the pre-existing keep-running default so the daemon stops with the app", async () => {
+  it("preserves the pre-existing keep-running choice", async () => {
     const userDataPath = await createTempUserDataDir();
     directories.add(userDataPath);
     await writeFile(
@@ -221,7 +222,7 @@ describe("desktop-settings", () => {
 
     const settings = await store.get();
 
-    expect(settings.daemon.keepRunningAfterQuit).toBe(false);
+    expect(settings.daemon.keepRunningAfterQuit).toBe(true);
   });
 
   it("keeps an explicit keep-running choice across restarts", async () => {
@@ -363,4 +364,39 @@ describe("desktop-settings", () => {
     expect(persisted.settings.releaseChannel).toBe("stable");
     expect(persisted.settings.tray).toEqual({ enabled: true });
   });
+});
+
+it("merges the lightweight profile once, preserving host data and backing up the original", async () => {
+  const home = await createTempUserDataDir();
+  const profilePath = path.join(home, "profile.json");
+  const original = {
+    daemon: { relay: { endpoint: "wss://example.invalid" } },
+    agents: {
+      providers: { cursor: { command: ["custom-cursor", "acp"] }, custom: { extends: "acp" } },
+    },
+  };
+  try {
+    await writeFile(path.join(home, "config.json"), JSON.stringify(original));
+    await writeFile(
+      profilePath,
+      JSON.stringify({
+        daemon: { relay: { enabled: true } },
+        features: { dictation: { enabled: false } },
+        agents: { providers: { cursor: { command: ["cursor-agent", "acp"], enabled: true } } },
+      }),
+    );
+    await applyLightweightProfile(home, profilePath);
+    const merged = JSON.parse(await readFile(path.join(home, "config.json"), "utf8"));
+    expect(merged.daemon.relay).toEqual({ endpoint: "wss://example.invalid", enabled: true });
+    expect(merged.agents.providers.cursor.command).toEqual(["custom-cursor", "acp"]);
+    expect(merged.agents.providers.custom).toEqual(original.agents.providers.custom);
+    const backup = (await readdir(home)).find((name) => name.startsWith("config.before-lite-"));
+    expect(JSON.parse(await readFile(path.join(home, backup!), "utf8"))).toEqual(original);
+    merged.features.dictation.enabled = true;
+    await writeFile(path.join(home, "config.json"), JSON.stringify(merged));
+    await applyLightweightProfile(home, profilePath);
+    expect(JSON.parse(await readFile(path.join(home, "config.json"), "utf8"))).toEqual(merged);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });

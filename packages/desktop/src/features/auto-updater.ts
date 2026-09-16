@@ -251,6 +251,17 @@ export async function checkForAppUpdate({
   releaseChannel: AppReleaseChannel;
   intent: AppUpdateCheckIntent;
 }): Promise<AppUpdateCheckResult> {
+  if (currentVersion.includes("-lite.")) {
+    return {
+      hasUpdate: false,
+      readyToInstall: false,
+      currentVersion,
+      latestVersion: currentVersion,
+      body: null,
+      date: null,
+      errorMessage: null,
+    };
+  }
   updateLifecycleLog.checkStarted({ currentVersion, releaseChannel, intent });
   const result = await appUpdateService.checkForAppUpdate({
     currentVersion,
@@ -279,6 +290,13 @@ export async function downloadAndInstallUpdate(
   },
   onBeforeQuit?: () => Promise<void>,
 ): Promise<AppUpdateInstallResult> {
+  if (currentVersion.includes("-lite.")) {
+    return {
+      installed: false,
+      version: null,
+      message: "Install custom Paseo Lite updates manually.",
+    };
+  }
   return appUpdateService.downloadAndInstallUpdate(
     { currentVersion, releaseChannel },
     onBeforeQuit,
@@ -303,5 +321,6 @@ export async function installAppUpdateOnQuit({
     return false;
   }
 
+  if (currentVersion.includes("-lite.")) return false;
   return appUpdateService.installUpdateOnQuit({ currentVersion, releaseChannel, signal });
 }

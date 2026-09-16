@@ -1975,6 +1975,10 @@ export class AgentManager {
     ) {
       return;
     }
+    const client = this.clients.get(agent.provider);
+    if (agent.persistence && client?.renameNativeSession) {
+      await client.renameNativeSession(agent.persistence, normalizedTitle);
+    }
     this.touchUpdatedAt(agent);
     await this.persistSnapshot(agent, { title: normalizedTitle });
     this.emitState(agent, { persist: false });
@@ -2250,6 +2254,13 @@ export class AgentManager {
       return;
     }
 
+    if (updates.title?.trim()) {
+      const stored = await this.registry?.get(agentId);
+      const client = stored && this.clients.get(stored.provider);
+      if (stored?.persistence && client?.renameNativeSession) {
+        await client.renameNativeSession(stored.persistence, updates.title.trim());
+      }
+    }
     await this.writeStoredMetadata(agentId, updates);
   }
 

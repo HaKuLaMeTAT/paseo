@@ -27,6 +27,7 @@ export class ScriptHealthMonitor {
   private readonly routeStates = new Map<string, RouteHealthState>();
   private readonly lastEmittedSnapshots = new Map<string, string>();
 
+  private unsubscribeRoutesChanged: (() => void) | null = null;
   private intervalHandle: NodeJS.Timeout | null = null;
   private pollInFlight = false;
 
@@ -54,24 +55,37 @@ export class ScriptHealthMonitor {
   }
 
   start(): void {
-    if (this.intervalHandle) {
-      return;
-    }
-
-    const now = Date.now();
-    for (const route of this.serviceProxy.getHealthCheckTargets()) {
-      this.getOrCreateState(route, now);
-    }
-
-    this.intervalHandle = setInterval(() => {
-      void this.poll();
-    }, this.pollIntervalMs);
+    if (this.unsubscribeRoutesChanged) return;
+    this.unsubscribeRoutesChanged = this.serviceProxy.subscribeRoutesChanged(() => {
+      this.reconcileRoutes();
+    });
+    this.reconcileRoutes();
   }
 
   stop(): void {
+    this.unsubscribeRoutesChanged?.();
+    this.unsubscribeRoutesChanged = null;
+    this.clearPollInterval();
+  }
+
+  private clearPollInterval(): void {
     if (this.intervalHandle) {
       clearInterval(this.intervalHandle);
       this.intervalHandle = null;
+    }
+  }
+
+  private reconcileRoutes(): void {
+    const routes = this.serviceProxy.getHealthCheckTargets();
+    this.pruneRemovedRoutes(new Set(routes.map((route) => route.hostname)));
+    const now = Date.now();
+    for (const route of routes) this.getOrCreateState(route, now);
+    if (routes.length === 0) {
+      this.clearPollInterval();
+    } else if (!this.intervalHandle) {
+      this.intervalHandle = setInterval(() => {
+        void this.poll();
+      }, this.pollIntervalMs);
     }
   }
 
@@ -87,14 +101,13 @@ export class ScriptHealthMonitor {
   }
 
   private async poll(): Promise<void> {
-    if (this.pollInFlight) {
+    if (this.pollInFlight || !this.unsubscribeRoutesChanged) {
       return;
     }
 
     this.pollInFlight = true;
     try {
       const routes = this.serviceProxy.getHealthCheckTargets();
-      const activeHostnames = new Set(routes.map((route) => route.hostname));
       const changedWorkspaceIds = new Set<string>();
       const now = Date.now();
 
@@ -104,8 +117,10 @@ export class ScriptHealthMonitor {
       const healthResults = await Promise.all(
         probeTargets.map(({ route }) => this.probeRoute(route.port)),
       );
+      if (!this.unsubscribeRoutesChanged) return;
       for (let i = 0; i < probeTargets.length; i += 1) {
         const { route, state } = probeTargets[i];
+        if (this.routeStates.get(route.hostname) !== state) continue;
         const isHealthy = healthResults[i];
         const previousHealth = state.health;
 
@@ -123,8 +138,6 @@ export class ScriptHealthMonitor {
           changedWorkspaceIds.add(route.workspaceId);
         }
       }
-
-      this.pruneRemovedRoutes(activeHostnames);
 
       for (const workspaceId of changedWorkspaceIds) {
         const scripts = this.buildWorkspaceScriptList(workspaceId);

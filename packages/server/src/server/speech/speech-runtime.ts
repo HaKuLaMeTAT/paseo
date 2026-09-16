@@ -681,6 +681,12 @@ export function createSpeechService(params: {
       return;
     }
     started = true;
+    if (!Object.values(providers).some((provider) => provider.enabled !== false)) {
+      publishReadinessIfChanged();
+      readySettled = true;
+      resolveReady();
+      return;
+    }
     void (async () => {
       try {
         await runReconcile();

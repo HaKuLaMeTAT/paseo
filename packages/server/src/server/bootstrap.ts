@@ -871,6 +871,8 @@ export async function createPaseoDaemon(
   });
   const github = createGitHubService();
   const workspaceGitService = new WorkspaceGitServiceImpl({
+    forgeStatusPolling: false,
+    backgroundFetch: false,
     logger,
     paseoHome: config.paseoHome,
     worktreesRoot: config.worktreesRoot,

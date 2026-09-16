@@ -541,6 +541,21 @@ beforeEach(() => {
   mockState.reset();
 });
 
+test("lightweight defaults retain the selected built-ins and custom ACP registration", () => {
+  const registry = buildProviderRegistry(logger, {
+    providerOverrides: {
+      custom: { extends: "acp", label: "Custom ACP", command: ["my-agent", "--acp"] },
+    },
+  });
+  expect(registry.claude.enabled).toBe(true);
+  expect(registry.codex.enabled).toBe(true);
+  expect(registry.opencode.enabled).toBe(true);
+  expect(registry.copilot.enabled).toBe(false);
+  expect(registry.pi.enabled).toBe(false);
+  expect(registry.omp.enabled).toBe(false);
+  expect(registry.custom.enabled).toBe(true);
+});
+
 test("builds registry with no overrides — same as built-in count", () => {
   const registry = buildProviderRegistry(logger);
 

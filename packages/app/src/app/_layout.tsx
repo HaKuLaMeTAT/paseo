@@ -668,15 +668,18 @@ function MobileGestureWrapper({
 function ProvidersWrapper({ children }: { children: ReactNode }) {
   const { upsertConnectionFromOfferUrl } = useHostMutations();
 
+  const content = (
+    <>
+      <DesktopWindowControlsSync />
+      <OfferLinkListener upsertDaemonFromOfferUrl={upsertConnectionFromOfferUrl} />
+      <HostSessionManager />
+      <FaviconStatusSync />
+      {children}
+    </>
+  );
   return (
     <AppearanceProvider>
-      <VoiceProvider>
-        <DesktopWindowControlsSync />
-        <OfferLinkListener upsertDaemonFromOfferUrl={upsertConnectionFromOfferUrl} />
-        <HostSessionManager />
-        <FaviconStatusSync />
-        {children}
-      </VoiceProvider>
+      {isWeb ? content : <VoiceProvider>{content}</VoiceProvider>}
     </AppearanceProvider>
   );
 }

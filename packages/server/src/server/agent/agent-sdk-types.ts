@@ -784,6 +784,8 @@ export interface AgentClient {
    */
   isAvailable(signal?: AbortSignal, options?: FetchCatalogOptions): Promise<boolean>;
   getDiagnostic?(): Promise<{ diagnostic: string }>;
+  /** Rename the durable provider session; failures must propagate to the caller. */
+  renameNativeSession?(handle: AgentPersistenceHandle, title: string): Promise<void>;
   /**
    * Archive a durable native session (best-effort). Runtime release belongs to AgentSession.close().
    * Called when Paseo archives an agent so the provider's own UI reflects the same state.

@@ -418,6 +418,19 @@ export class ServiceProxyRouteCollisionError extends Error {
 }
 
 export class ServiceProxyRouteRegistry {
+  private readonly routeListeners = new Set<() => void>();
+
+  subscribeRoutesChanged(listener: () => void): () => void {
+    this.routeListeners.add(listener);
+    return () => {
+      this.routeListeners.delete(listener);
+    };
+  }
+
+  private notifyRoutesChanged(): void {
+    for (const listener of this.routeListeners) listener();
+  }
+
   private routes = new Map<string, ServiceProxyRouteEntry>();
   private hostnameAliases = new Map<string, string>();
   private workspaceHostnames = new Map<string, Set<string>>();
@@ -465,6 +478,7 @@ export class ServiceProxyRouteRegistry {
       this.publicBaseHostnames.add(new URL(storedEntry.publicBaseUrl).hostname.toLowerCase());
     }
     this.addHostnameToWorkspaceIndex(storedEntry.workspaceId, storedEntry.hostname);
+    this.notifyRoutesChanged();
   }
 
   replaceWorkspaceBranchRoutes(params: { workspaceId: string; newBranch: string | null }): boolean {
@@ -528,6 +542,7 @@ export class ServiceProxyRouteRegistry {
     }
     this.removeHostnameFromWorkspaceIndex(entry.workspaceId, canonicalHostname);
     this.rebuildPublicBaseHostnames();
+    this.notifyRoutesChanged();
   }
 
   removeRouteForWorkspaceScript(params: { workspaceId: string; scriptName: string }): void {
@@ -617,6 +632,7 @@ export class ServiceProxyRouteRegistry {
       }
     }
     this.rebuildPublicBaseHostnames();
+    this.notifyRoutesChanged();
   }
 
   classifyHost(host: string | undefined): HostClassification {
@@ -797,6 +813,7 @@ export function createScriptProxyUpgradeHandler({
 }
 
 export interface ServiceProxySubsystem {
+  subscribeRoutesChanged(listener: () => void): () => void;
   registerWorkspaceService(input: RegisterWorkspaceServiceInput): ServiceProxyRouteEntry;
   removeWorkspaceService(params: { workspaceId: string; scriptName: string }): void;
   removeServiceRoutesByHostnames(hostnames: string[]): void;
@@ -847,6 +864,9 @@ export function createServiceProxySubsystem({
 }
 
 class NodeServiceProxySubsystem implements ServiceProxySubsystem {
+  subscribeRoutesChanged(listener: () => void): () => void {
+    return this.routes.subscribeRoutesChanged(listener);
+  }
   private readonly routes: ServiceProxyRouteRegistry;
   private standaloneServer: ReturnType<typeof createHTTPServer> | null = null;
   private standaloneListenTarget: ServiceProxyListenTarget | null = null;

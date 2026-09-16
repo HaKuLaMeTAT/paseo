@@ -94,7 +94,7 @@ function buildApplicationMenuTemplate(
       label: "File",
       submenu: [
         {
-          label: "New Window",
+          label: "Show Window",
           accelerator: "CmdOrCtrl+Shift+N",
           click: () => {
             options.onNewWindow();

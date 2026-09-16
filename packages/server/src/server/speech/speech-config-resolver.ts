@@ -44,7 +44,7 @@ const RequestedSpeechProvidersSchema = z.object({
 });
 
 function resolveOptionalBooleanFlag(value: unknown): boolean {
-  return OptionalBooleanFlagSchema.parse(value) ?? true;
+  return OptionalBooleanFlagSchema.parse(value) ?? false;
 }
 
 interface FeatureProviderInputs {

@@ -221,6 +221,7 @@ export const AGENT_PROVIDER_DEFINITIONS: AgentProviderDefinition[] = [
   },
   {
     id: "copilot",
+    enabledByDefault: false,
     label: "Copilot",
     description: "GitHub Copilot via Agent Client Protocol with dynamic modes and session support",
     defaultModeId: "https://agentclientprotocol.com/protocol/session-modes#agent",
@@ -242,6 +243,7 @@ export const AGENT_PROVIDER_DEFINITIONS: AgentProviderDefinition[] = [
   },
   {
     id: "pi",
+    enabledByDefault: false,
     label: "Pi",
     description: "Minimal terminal-based coding agent with multi-provider LLM support",
     defaultModeId: null,

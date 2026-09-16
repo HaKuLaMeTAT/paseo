@@ -1,0 +1,612 @@
+{
+  "desktop_detection": {
+    "hits": [
+      {
+        "file": "packages/app/src/attachments/store.ts",
+        "line": 9,
+        "text": "if (isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/command-center/workspace-registration.tsx",
+        "line": 108,
+        "text": "const platform = { isMac: getShortcutOs() === \"mac\", isDesktop: getIsElectron() };"
+      },
+      {
+        "file": "packages/app/src/command-center/workspace-registration.tsx",
+        "line": 288,
+        "text": "canOpenBrowserTabs: getIsElectron(),"
+      },
+      {
+        "file": "packages/app/src/components/add-host-method-modal.tsx",
+        "line": 103,
+        "text": "{isElectronRuntime() ? ("
+      },
+      {
+        "file": "packages/app/src/components/app-diagnostic-host.tsx",
+        "line": 15,
+        "text": "isDesktopApp={isElectronRuntime()}"
+      },
+      {
+        "file": "packages/app/src/components/sidebar-workspace-list.tsx",
+        "line": 549,
+        "text": "const canOpenInNewWindow = getIsElectron() && projectPath.trim().length > 0;"
+      },
+      {
+        "file": "packages/app/src/components/welcome-screen.tsx",
+        "line": 264,
+        "text": "if (isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/constants/platform.ts",
+        "line": 40,
+        "text": "export function getIsElectron(): boolean {"
+      },
+      {
+        "file": "packages/app/src/constants/platform.ts",
+        "line": 43,
+        "text": "const result = isElectronRuntime();"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/new-tab-requests/index.ts",
+        "line": 85,
+        "text": "if (!input.enabled || !getIsElectron()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 723,
+        "text": "if (!isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 998,
+        "text": "if (!isElectronRuntime() || !isInteractive) {"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1025,
+        "text": "if (!isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1277,
+        "text": "if (!isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1426,
+        "text": "if (!isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 182,
+        "text": "return isElectronRuntime();"
+      },
+      {
+        "file": "packages/app/src/desktop/hooks/use-enable-built-in-daemon-option.ts",
+        "line": 17,
+        "text": "const isElectron = getIsElectron();"
+      },
+      {
+        "file": "packages/app/src/desktop/host.ts",
+        "line": 205,
+        "text": "export function isElectronRuntime(): boolean {"
+      },
+      {
+        "file": "packages/app/src/desktop/host.ts",
+        "line": 210,
+        "text": "if (!isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/settings/desktop-settings.ts",
+        "line": 102,
+        "text": "if (!getIsElectron()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/settings/desktop-settings.ts",
+        "line": 125,
+        "text": "if (!getIsElectron()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/settings/desktop-settings.ts",
+        "line": 134,
+        "text": "if (!getIsElectron()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/settings/desktop-settings.ts",
+        "line": 146,
+        "text": "if (!getIsElectron()) {"
+      },
+      {
+        "file": "packages/app/src/desktop/updates/desktop-updates.ts",
+        "line": 65,
+        "text": "return isWeb && isElectronRuntime();"
+      },
+      {
+        "file": "packages/app/src/hooks/use-audio-recorder.web.ts",
+        "line": 33,
+        "text": "const isDesktopApp = isElectronRuntime();"
+      },
+      {
+        "file": "packages/app/src/hooks/use-client-activity.ts",
+        "line": 96,
+        "text": "if (!getIsElectron()) return;"
+      },
+      {
+        "file": "packages/app/src/hooks/use-dictation-audio-source.web.ts",
+        "line": 248,
+        "text": "const isDesktopApp = isElectronRuntime();"
+      },
+      {
+        "file": "packages/app/src/hooks/use-file-picker.ts",
+        "line": 112,
+        "text": "if (isWeb && isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/hooks/use-image-attachment-picker.ts",
+        "line": 53,
+        "text": "if (isWeb && isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/hooks/use-keyboard-shortcuts.ts",
+        "line": 384,
+        "text": "const browserShortcutSubscription = isElectronRuntime()"
+      },
+      {
+        "file": "packages/app/src/hooks/use-settings/index.ts",
+        "line": 193,
+        "text": "if (isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/hooks/use-settings/index.ts",
+        "line": 215,
+        "text": "if (isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/screens/settings-screen.tsx",
+        "line": 1084,
+        "text": "const isDesktopApp = isElectronRuntime();"
+      },
+      {
+        "file": "packages/app/src/screens/settings-screen.tsx",
+        "line": 1230,
+        "text": "const isDesktopApp = isElectronRuntime();"
+      },
+      {
+        "file": "packages/app/src/screens/workspace/workspace-screen.tsx",
+        "line": 294,
+        "text": "if (!getIsElectron()) {"
+      },
+      {
+        "file": "packages/app/src/screens/workspace/workspace-screen.tsx",
+        "line": 2398,
+        "text": "if (!persistenceKey || !getIsElectron()) {"
+      },
+      {
+        "file": "packages/app/src/screens/workspace/workspace-screen.tsx",
+        "line": 2459,
+        "text": "if (!persistenceKey || !getIsElectron()) {"
+      },
+      {
+        "file": "packages/app/src/screens/workspace/workspace-screen.tsx",
+        "line": 3848,
+        "text": "const showCreateBrowserTab = getIsElectron();"
+      },
+      {
+        "file": "packages/app/src/utils/open-service-url.ts",
+        "line": 16,
+        "text": "if (!openInApp || !isElectronRuntime()) {"
+      },
+      {
+        "file": "packages/app/src/voice/audio-engine.web.ts",
+        "line": 292,
+        "text": "const isDesktopApp = isElectronRuntime();"
+      },
+      {
+        "file": "packages/app/src/workspace/open-in-file-manager/menu-item.tsx",
+        "line": 33,
+        "text": "const isElectron = getIsElectron();"
+      }
+    ],
+    "occurrences": 41,
+    "files": 26
+  },
+  "desktop_host": {
+    "hits": [
+      {
+        "file": "packages/app/src/app/_layout.tsx",
+        "line": 183,
+        "text": "const unlistenResult = getDesktopHost()?.events?.on?.("
+      },
+      {
+        "file": "packages/app/src/app/_layout.tsx",
+        "line": 825,
+        "text": "void getDesktopHost()"
+      },
+      {
+        "file": "packages/app/src/components/file-drop/use-drop-listeners.ts",
+        "line": 109,
+        "text": "const desktopHost = getDesktopHost();"
+      },
+      {
+        "file": "packages/app/src/components/sidebar-workspace-list.tsx",
+        "line": 553,
+        "text": "void getDesktopHost()"
+      },
+      {
+        "file": "packages/app/src/components/terminal-emulator.tsx",
+        "line": 643,
+        "text": "const bridge = getDesktopHost();"
+      },
+      {
+        "file": "packages/app/src/desktop/agent-navigation.tsx",
+        "line": 23,
+        "text": "const host = getDesktopHost();"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/new-tab-requests/index.ts",
+        "line": 88,
+        "text": "const unsubscribe = getDesktopHost()?.events?.on?.("
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 851,
+        "text": "const focusBrowser = getDesktopHost()?.browser?.focus;"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1028,
+        "text": "const unsubscribe = getDesktopHost()?.events?.on?.(\"browser-shortcut\", (payload) => {"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1082,
+        "text": "const captureElement = getDesktopHost()?.browser?.captureElement;"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1111,
+        "text": "const copyElement = getDesktopHost()?.browser?.copyElement;"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1112,
+        "text": "const captureElement = getDesktopHost()?.browser?.captureElement;"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1311,
+        "text": "const openDevTools = getDesktopHost()?.browser?.openDevTools;"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/resident-webviews.ts",
+        "line": 49,
+        "text": "const browser = getDesktopHost()?.browser;"
+      },
+      {
+        "file": "packages/app/src/desktop/browser/settings/browser-data-section.tsx",
+        "line": 37,
+        "text": "const clearProfile = getDesktopHost()?.browser?.clearProfile;"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 263,
+        "text": "const listen = getDesktopHost()?.events?.on;"
+      },
+      {
+        "file": "packages/app/src/desktop/electron/events.ts",
+        "line": 13,
+        "text": "const listen = getDesktopHost()?.events?.on;"
+      },
+      {
+        "file": "packages/app/src/desktop/electron/invoke.ts",
+        "line": 7,
+        "text": "const invoke = getDesktopHost()?.invoke;"
+      },
+      {
+        "file": "packages/app/src/desktop/electron/window.ts",
+        "line": 8,
+        "text": "const getter = getDesktopHost()?.window?.getCurrentWindow;"
+      },
+      {
+        "file": "packages/app/src/desktop/host.ts",
+        "line": 198,
+        "text": "export function getDesktopHost(): DesktopHostBridge | null {"
+      },
+      {
+        "file": "packages/app/src/desktop/host.ts",
+        "line": 206,
+        "text": "return getDesktopHost() !== null;"
+      },
+      {
+        "file": "packages/app/src/desktop/host.ts",
+        "line": 216,
+        "text": "const hostPlatform = getDesktopHost()?.platform?.toLowerCase();"
+      },
+      {
+        "file": "packages/app/src/desktop/host.ts",
+        "line": 225,
+        "text": "const host = getDesktopHost();"
+      },
+      {
+        "file": "packages/app/src/desktop/permissions/desktop-permissions.ts",
+        "line": 126,
+        "text": "return env.isWeb && env.getDesktopHost() !== null;"
+      },
+      {
+        "file": "packages/app/src/desktop/permissions/desktop-permissions.ts",
+        "line": 137,
+        "text": "const desktopHost = env.getDesktopHost();"
+      },
+      {
+        "file": "packages/app/src/desktop/pick-directory.ts",
+        "line": 4,
+        "text": "dialog: DesktopDialogBridge | null = getDesktopHost()?.dialog ?? null,"
+      },
+      {
+        "file": "packages/app/src/hooks/use-favicon-status.ts",
+        "line": 84,
+        "text": "const desktopWindow = getDesktopHost()?.window?.getCurrentWindow?.();"
+      },
+      {
+        "file": "packages/app/src/hooks/use-file-picker.ts",
+        "line": 10,
+        "text": "const dialog = getDesktopHost()?.dialog;"
+      },
+      {
+        "file": "packages/app/src/hooks/use-image-attachment-picker.ts",
+        "line": 54,
+        "text": "const selectedImages = await pickImagesWithDesktopDialog(getDesktopHost()?.dialog);"
+      },
+      {
+        "file": "packages/app/src/hooks/use-keyboard-shortcuts.ts",
+        "line": 91,
+        "text": "void getDesktopHost()?.browser?.setShortcutPolicy?.(policy);"
+      },
+      {
+        "file": "packages/app/src/hooks/use-keyboard-shortcuts.ts",
+        "line": 385,
+        "text": "? getDesktopHost()?.events?.on?.(\"browser-shortcut-input\", (payload) => {"
+      },
+      {
+        "file": "packages/app/src/runtime/host-runtime.ts",
+        "line": 494,
+        "text": "typeof getDesktopHost()?.browser?.executeAutomationCommand === \"function\";"
+      },
+      {
+        "file": "packages/app/src/screens/settings/keyboard-shortcuts-section.tsx",
+        "line": 412,
+        "text": "const menu = getDesktopHost()?.menu;"
+      },
+      {
+        "file": "packages/app/src/screens/workspace/workspace-screen.tsx",
+        "line": 297,
+        "text": "void getDesktopHost()?.browser?.setWorkspaceActiveBrowser?.({"
+      },
+      {
+        "file": "packages/app/src/screens/workspace/workspace-screen.tsx",
+        "line": 1900,
+        "text": "void getDesktopHost()?.browser?.unregisterWorkspaceBrowser?.(browserId);"
+      },
+      {
+        "file": "packages/app/src/utils/confirm-dialog.ts",
+        "line": 56,
+        "text": "return getDesktopHost();"
+      },
+      {
+        "file": "packages/app/src/utils/open-external-url.ts",
+        "line": 17,
+        "text": "const opener = getDesktopHost()?.opener?.openUrl;"
+      },
+      {
+        "file": "packages/app/src/utils/open-service-url.ts",
+        "line": 35,
+        "text": "const askWithCheckbox = getDesktopHost()?.dialog?.askWithCheckbox;"
+      },
+      {
+        "file": "packages/app/src/utils/os-notifications.ts",
+        "line": 32,
+        "text": "const sendNotification = getDesktopHost()?.notification?.sendNotification;"
+      },
+      {
+        "file": "packages/app/src/workspace/desktop-open-targets.ts",
+        "line": 45,
+        "text": "const bridge = getDesktopHost()?.editor;"
+      }
+    ],
+    "occurrences": 40,
+    "files": 28
+  },
+  "desktop_invoke": {
+    "hits": [
+      {
+        "file": "packages/app/src/desktop/attachments/desktop-file-commands.ts",
+        "line": 13,
+        "text": "return await invokeDesktopCommand<AttachmentFileResult>(\"write_attachment_base64\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/attachments/desktop-file-commands.ts",
+        "line": 25,
+        "text": "return await invokeDesktopCommand<AttachmentFileResult>(\"write_attachment_bytes\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/attachments/desktop-file-commands.ts",
+        "line": 37,
+        "text": "return await invokeDesktopCommand<AttachmentFileResult>(\"copy_attachment_file\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/attachments/desktop-file-commands.ts",
+        "line": 45,
+        "text": "return await invokeDesktopCommand<boolean>(\"delete_attachment_file\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/attachments/desktop-file-commands.ts",
+        "line": 53,
+        "text": "return await invokeDesktopCommand<number>(\"garbage_collect_attachment_files\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/attachments/desktop-preview-url.ts",
+        "line": 21,
+        "text": "return await invokeDesktopCommand<string>(\"read_file_base64\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 186,
+        "text": "return parseDesktopDaemonStatus(await invokeDesktopCommand(\"desktop_daemon_status\"));"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 190,
+        "text": "return parseDesktopDaemonStatus(await invokeDesktopCommand(\"start_desktop_daemon\"));"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 196,
+        "text": "return parseDesktopDaemonStatus(await invokeDesktopCommand(\"stop_desktop_daemon\", { reason }));"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 218,
+        "text": "await invokeDesktopCommand(\"stop_desktop_daemon\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 227,
+        "text": "return parseDesktopDaemonStatus(await invokeDesktopCommand(\"restart_desktop_daemon\"));"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 231,
+        "text": "return parseDesktopDaemonLogs(await invokeDesktopCommand(\"desktop_daemon_logs\"));"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 235,
+        "text": "const raw = await invokeDesktopCommand(\"desktop_app_logs\");"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 246,
+        "text": "return parseDesktopUpdaterDiagnostics(await invokeDesktopCommand(\"desktop_update_diagnostics\"));"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 250,
+        "text": "const raw = await invokeDesktopCommand<unknown>(\"cli_daemon_status\");"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 287,
+        "text": "await invokeDesktopCommand(\"open_local_daemon_transport\", input);"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 295,
+        "text": "await invokeDesktopCommand(\"send_local_daemon_transport_message\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 303,
+        "text": "await invokeDesktopCommand(\"close_local_daemon_transport\", { sessionId });"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 322,
+        "text": "return parseInstallStatus(await invokeDesktopCommand(\"get_cli_install_status\"));"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 326,
+        "text": "return parseInstallStatus(await invokeDesktopCommand(\"install_cli\"));"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 331,
+        "text": "return invokeDesktopCommand(\"read_legacy_skill_selection\") as Promise<AgentSkillSelection | null>;"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 336,
+        "text": "await invokeDesktopCommand(\"delete_legacy_skill_selection\");"
+      },
+      {
+        "file": "packages/app/src/desktop/daemon/desktop-daemon.ts",
+        "line": 345,
+        "text": "const result: unknown = await invokeDesktopCommand(\"desktop_sandbox_diagnostics\");"
+      },
+      {
+        "file": "packages/app/src/desktop/electron/invoke.ts",
+        "line": 3,
+        "text": "export async function invokeDesktopCommand<T>("
+      },
+      {
+        "file": "packages/app/src/desktop/settings/desktop-settings.ts",
+        "line": 128,
+        "text": "return parseDesktopSettings(await invokeDesktopCommand<unknown>(\"get_desktop_settings\"));"
+      },
+      {
+        "file": "packages/app/src/desktop/settings/desktop-settings.ts",
+        "line": 138,
+        "text": "await invokeDesktopCommand<unknown>(\"patch_desktop_settings\", normalizePatch(updates)),"
+      },
+      {
+        "file": "packages/app/src/desktop/settings/desktop-settings.ts",
+        "line": 149,
+        "text": "await invokeDesktopCommand(\"migrate_legacy_desktop_settings\", input);"
+      },
+      {
+        "file": "packages/app/src/desktop/updates/desktop-updates.ts",
+        "line": 80,
+        "text": "const result = await invokeDesktopCommand<unknown>(\"get_local_daemon_version\");"
+      },
+      {
+        "file": "packages/app/src/desktop/updates/desktop-updates.ts",
+        "line": 99,
+        "text": "const result = await invokeDesktopCommand<unknown>(\"desktop_get_runtime_info\");"
+      },
+      {
+        "file": "packages/app/src/desktop/updates/desktop-updates.ts",
+        "line": 110,
+        "text": "const result = await invokeDesktopCommand<unknown>(\"check_app_update\", {"
+      },
+      {
+        "file": "packages/app/src/desktop/updates/desktop-updates.ts",
+        "line": 134,
+        "text": "const result = await invokeDesktopCommand<unknown>(\"install_app_update\", { releaseChannel });"
+      },
+      {
+        "file": "packages/app/src/desktop/updates/desktop-updates.ts",
+        "line": 147,
+        "text": "const result = await invokeDesktopCommand<unknown>(\"run_local_daemon_update\");"
+      }
+    ],
+    "occurrences": 32,
+    "files": 6
+  },
+  "raw_electron_bridge": {
+    "hits": [
+      {
+        "file": "packages/app/src/components/terminal-emulator.tsx",
+        "line": 560,
+        "text": "const showContextMenu = window.paseoDesktop?.menu?.showContextMenu;"
+      },
+      {
+        "file": "packages/app/src/desktop/electron/host.ts",
+        "line": 7,
+        "text": "const host = window.paseoDesktop;"
+      }
+    ],
+    "occurrences": 2,
+    "files": 2
+  },
+  "webview": {
+    "hits": [
+      {
+        "file": "packages/app/src/desktop/browser/pane/index.electron.tsx",
+        "line": 1130,
+        "text": "// with NotAllowedError because focus is inside the guest <webview>."
+      }
+    ],
+    "occurrences": 1,
+    "files": 1
+  }
+}

@@ -90,6 +90,31 @@ describe("createSpeechService readiness", () => {
     initializeLocalSpeechServicesMock.mockReset();
   });
 
+  it("does not initialize providers or download models when all speech is disabled", async () => {
+    vi.useFakeTimers();
+    const runtime = createSpeechService({
+      logger: pino({ level: "silent" }),
+      speechConfig: createSpeechConfig({
+        dictationStt: { provider: "local", enabled: false, explicit: false },
+        voiceTurnDetection: { provider: "local", enabled: false, explicit: false },
+        voiceStt: { provider: "local", enabled: false, explicit: false },
+        voiceTts: { provider: "local", enabled: false, explicit: false },
+      }),
+    });
+    try {
+      runtime.start();
+      await runtime.ready;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(runtime.getReadiness().voiceFeature.reasonCode).toBe("disabled");
+      expect(initializeLocalSpeechServicesMock).not.toHaveBeenCalled();
+      expect(ensureLocalSpeechModelsMock).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      await runtime.stop();
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps voice feature available when only dictation is enabled and ready", async () => {
     const dictationStt = createStubStt("dictation-local");
 

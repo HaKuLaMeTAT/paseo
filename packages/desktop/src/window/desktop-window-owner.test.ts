@@ -5,7 +5,7 @@ interface Target {
   id: string;
 }
 
-function harness() {
+function harness(singleWindow = false) {
   const windows: OwnedDesktopWindow<Target>[] = [];
   const launches: Array<{ initialRoute: string | null; restoreWindowState: boolean }> = [];
   const sent: Target[] = [];
@@ -13,7 +13,9 @@ function harness() {
   let focused: OwnedDesktopWindow<Target> | null = null;
   let closeWindow = (_id: number) => {};
   const owner = createDesktopWindowOwner<Target>({
+    singleWindow,
     async create(input) {
+      await Promise.resolve();
       launches.push({
         initialRoute: input.initialRoute,
         restoreWindowState: input.restoreWindowState,
@@ -52,6 +54,17 @@ function harness() {
 }
 
 describe("desktop window owner", () => {
+  it("serializes concurrent single-window launches and reuses project routing", async () => {
+    const h = harness(true);
+    await Promise.all([h.owner.openPrimary(), h.owner.openAdditional(), h.owner.openPrimary()]);
+    expect(h.launches).toHaveLength(1);
+    await h.owner.openAdditional({ pendingProjectPath: "/project/new" });
+    expect(h.owner.takePendingProject(1)).toBe("/project/new");
+    await h.owner.openOrFocusAgent({ id: "agent-8" });
+    expect(h.sent).toEqual([{ id: "agent-8" }]);
+    expect(h.launches).toHaveLength(1);
+  });
+
   it("restores only primary launches and routes pending projects per window", async () => {
     const h = harness();
     await h.owner.openPrimary({ pendingProjectPath: " /project/a " });

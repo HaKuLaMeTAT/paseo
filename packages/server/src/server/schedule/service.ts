@@ -261,10 +261,16 @@ export class ScheduleService {
     runId: string,
   ) => Promise<ScheduleExecutionResult>;
   private readonly runningScheduleIds = new Set<string>();
+  private started = false;
+  private readonly activeScheduleIds = new Set<string>();
   private tickTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: ScheduleServiceOptions) {
-    this.store = new ScheduleStore(join(options.paseoHome, "schedules"));
+    this.store = new ScheduleStore(join(options.paseoHome, "schedules"), (id, schedule) => {
+      if (schedule?.status === "active" && schedule.nextRunAt) this.activeScheduleIds.add(id);
+      else this.activeScheduleIds.delete(id);
+      this.reconcileTickTimer();
+    });
     this.logger = options.logger.child({ module: "schedule-service" });
     this.agentManager = options.agentManager;
     this.agentStorage = options.agentStorage;
@@ -277,25 +283,36 @@ export class ScheduleService {
   }
 
   async start(): Promise<void> {
+    if (this.started) return;
     await this.recoverInterruptedRuns();
     await this.sweepOrphanedSchedules();
-    if (this.tickTimer) {
+    this.activeScheduleIds.clear();
+    for (const schedule of await this.store.list()) {
+      if (schedule.status === "active" && schedule.nextRunAt)
+        this.activeScheduleIds.add(schedule.id);
+    }
+    this.started = true;
+    this.reconcileTickTimer();
+  }
+
+  private reconcileTickTimer(): void {
+    if (!this.started || this.activeScheduleIds.size === 0) {
+      if (this.tickTimer) clearInterval(this.tickTimer);
+      this.tickTimer = null;
       return;
     }
-    const timer = setInterval(() => {
+    if (this.tickTimer) return;
+    this.tickTimer = setInterval(() => {
       void this.tick().catch((error) => {
         this.logger.error({ err: error }, "Failed to process schedule tick");
       });
     }, SCHEDULE_TICK_INTERVAL_MS);
-    (timer as unknown as { unref?: () => void }).unref?.();
-    this.tickTimer = timer;
+    this.tickTimer.unref?.();
   }
 
   async stop(): Promise<void> {
-    if (this.tickTimer) {
-      clearInterval(this.tickTimer);
-      this.tickTimer = null;
-    }
+    this.started = false;
+    this.reconcileTickTimer();
   }
 
   async create(input: CreateScheduleInput): Promise<StoredSchedule> {

@@ -226,6 +226,8 @@ export const zhCN: TranslationResources = {
     },
   },
   agentStream: {
+    expandProcess: "展开本轮过程",
+    collapseProcess: "收起本轮过程",
     empty: "开始和这个 Agent 对话...",
     scrollToBottom: "滚动到底部",
     historyLoadFailed: "无法加载智能体历史记录",

@@ -1,3 +1,4 @@
+import { useRetainedPanelActive } from "@/components/retained-panel";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -204,6 +205,7 @@ export function usePrPaneData({
   const { t } = useTranslation();
   const daemonClient = useHostRuntimeClient(serverId);
   const isConnected = useHostRuntimeIsConnected(serverId);
+  const panelActive = useRetainedPanelActive();
   const checkoutPrStatus = useCheckoutPrStatusQuery({ serverId, cwd, enabled });
   const status = checkoutPrStatus.status;
   const identity = extractPrRepoIdentity(status);
@@ -217,7 +219,7 @@ export function usePrPaneData({
   const shouldFetchTimeline = shouldFetchTimelineFrom({
     hasClient: !!daemonClient,
     isConnected,
-    timelineEnabled,
+    timelineEnabled: timelineEnabled && enabled && panelActive,
     githubFeaturesEnabled,
     cwd,
     identity,
@@ -249,9 +251,8 @@ export function usePrPaneData({
       });
     },
     enabled: shouldFetchTimeline,
-    staleTime: Infinity,
-    // Refetch on mount only after explicit invalidation (reconnect, or a pushed PR status
-    // change) — see useCheckoutStatusQuery for the rationale.
+    // Fetch on visible demand; no timer is needed while the panel is retained.
+    staleTime: 0,
     refetchOnMount: true,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,

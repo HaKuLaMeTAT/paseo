@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Image } from "react-native";
 import { Globe } from "lucide-react-native";
 import invariant from "tiny-invariant";
+import { supportsEmbeddedBrowser } from "@/desktop/host";
 import { BrowserPane } from "@/desktop/browser/pane";
 import { usePaneContext, usePaneFocus } from "@/panels/pane-context";
 import { definePanel, type PanelDescriptor, type PanelIconProps } from "@/panels/panel-registry";
@@ -41,7 +42,8 @@ function useBrowserPanelDescriptor(target: {
 }): PanelDescriptor {
   const browser = useBrowserStore((state) => state.browsersById[target.browserId] ?? null);
   const url = browser?.url ?? "https://example.com";
-  const icon = createBrowserTabIcon(browser?.faviconUrl ?? null);
+  const enabled = supportsEmbeddedBrowser();
+  const icon = createBrowserTabIcon(enabled ? (browser?.faviconUrl ?? null) : null);
   const label = getBrowserLabel({ title: browser?.title ?? "", url });
 
   return {
@@ -50,7 +52,7 @@ function useBrowserPanelDescriptor(target: {
     tooltip: url || label,
     titleState: "ready",
     icon,
-    statusBucket: browser?.isLoading ? "running" : null,
+    statusBucket: enabled && browser?.isLoading ? "running" : null,
   };
 }
 

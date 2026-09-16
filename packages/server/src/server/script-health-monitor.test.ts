@@ -144,6 +144,46 @@ async function advancePoll(ms: number): Promise<void> {
 }
 
 describe("ScriptHealthMonitor", () => {
+  it("sleeps without routes and resumes only while a route exists", async () => {
+    vi.useFakeTimers();
+    const routeStore = new ScriptRouteStore();
+    const reads = vi.spyOn(routeStore, "getHealthCheckTargets");
+    const monitor = new ScriptHealthMonitor({ serviceProxy: routeStore, onChange: vi.fn() });
+    try {
+      monitor.start();
+      const initialReads = reads.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(reads).toHaveBeenCalledTimes(initialReads);
+      expect(vi.getTimerCount()).toBe(0);
+      const route = routeStore.registerWorkspaceService({
+        workspaceId: "workspace-idle",
+        projectSlug: "repo",
+        branchName: "main",
+        scriptName: "dev",
+        port: 12345,
+      });
+      expect(vi.getTimerCount()).toBe(1);
+      expect(monitor.getHealthForHostname(route.hostname)).toBe("pending");
+      routeStore.removeWorkspaceService({ workspaceId: "workspace-idle", scriptName: "dev" });
+      expect(vi.getTimerCount()).toBe(0);
+      expect(monitor.getHealthForHostname(route.hostname)).toBeNull();
+      monitor.stop();
+      routeStore.registerWorkspaceService({
+        workspaceId: "workspace-idle",
+        projectSlug: "repo",
+        branchName: "main",
+        scriptName: "dev",
+        port: 12345,
+      });
+      expect(vi.getTimerCount()).toBe(0);
+      monitor.start();
+      expect(vi.getTimerCount()).toBe(1);
+    } finally {
+      monitor.stop();
+      vi.useRealTimers();
+    }
+  });
+
   const servers = new Set<net.Server>();
 
   afterEach(async () => {

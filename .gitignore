@@ -90,3 +90,9 @@ packages/protocol/src/generated/validation/*.aot.ts
 packages/desktop/.cache/
 packages/desktop/src-tauri/resources/managed-runtime/
 app.json
+
+/.artifacts/
+
+# Local Windows shell captures contain machine paths and process details.
+/experiments/windows-shell/evidence/pilots/
+/experiments/windows-shell/evidence/runs/

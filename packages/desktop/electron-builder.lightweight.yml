@@ -1,0 +1,18 @@
+extends: ./electron-builder.yml
+appId: sh.paseo.desktop.lite
+productName: Paseo Lite
+extraMetadata:
+  version: 0.8.0-lite.2
+publish: null
+extraResources:
+  - from: ../../config/lightweight.json
+    to: lightweight.json
+directories:
+  output: release-lite
+win:
+  artifactName: Paseo-Lite-${version}-${arch}.${ext}
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]

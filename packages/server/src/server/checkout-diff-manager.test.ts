@@ -163,6 +163,22 @@ describe("CheckoutDiffManager", () => {
     };
   }
 
+  test("reopening a diff requests fresh content after its watcher was released", async () => {
+    const { manager, workspaceGitService } = createManager();
+    const params = { cwd: "/tmp/repo", compare: { mode: "uncommitted" as const } };
+    const first = await manager.subscribe(params, vi.fn());
+    first.unsubscribe();
+    workspaceGitService.getCheckoutDiff.mockClear();
+    const reopened = await manager.subscribe(params, vi.fn());
+    expect(workspaceGitService.getCheckoutDiff).toHaveBeenCalledWith(
+      "/tmp/repo",
+      expect.any(Object),
+      { force: true, reason: "checkout-diff-open" },
+    );
+    reopened.unsubscribe();
+    manager.dispose();
+  });
+
   test("subscribe requests a working tree watch with the correct cwd", async () => {
     const { manager, mockRequestWorkingTreeWatch } = createManager();
 
@@ -258,7 +274,7 @@ describe("CheckoutDiffManager", () => {
     expect(workspaceGitService.getCheckoutDiff).toHaveBeenCalledWith(
       "/tmp/repo",
       expect.objectContaining({ mode: "uncommitted", includeStructured: true }),
-      undefined,
+      { force: true, reason: "checkout-diff-open" },
     );
   });
 
@@ -329,7 +345,7 @@ describe("CheckoutDiffManager", () => {
       1,
       "/tmp/repo",
       expect.objectContaining({ mode: "uncommitted" }),
-      undefined,
+      { force: true, reason: "checkout-diff-open" },
     );
 
     const onChange = getOnChange();
@@ -479,7 +495,7 @@ describe("CheckoutDiffManager", () => {
     expect(workspaceGitService.getCheckoutDiff).toHaveBeenCalledWith(
       "/tmp/plain",
       expect.objectContaining({ mode: "uncommitted", includeStructured: true }),
-      undefined,
+      { force: true, reason: "checkout-diff-open" },
     );
   });
 });

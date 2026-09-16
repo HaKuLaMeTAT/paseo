@@ -62,6 +62,7 @@ import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { ToolCallDetailsContent } from "@/components/tool-call-details";
 import { QuestionFormCard } from "@/components/question-form-card";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
+import { useCompletedProcessPresentation } from "./completed-process";
 import { createStreamPresentation } from "./presentation";
 import { OverviewToolCallGroupView } from "@/tool-calls/detail-level/overview/view";
 import { type AgentStreamRenderModel, buildAgentStreamRenderModel } from "./model";
@@ -363,6 +364,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         }),
       [isMobile],
     );
+    const [expandedProcessIds, setExpandedProcessIds] = useState<Set<string>>(new Set());
     const [isNearBottom, setIsNearBottom] = useState(true);
     const [expandedInlineToolCallIds, setExpandedInlineToolCallIds] = useState<Set<string>>(
       new Set(),
@@ -432,6 +434,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 
     useEffect(() => {
       setIsNearBottom(true);
+      setExpandedProcessIds(new Set());
       setExpandedInlineToolCallIds(new Set());
       setExpandedToolCallGroupIds(new Set());
     }, [agentId]);
@@ -535,7 +538,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     const effectiveTurnPresentation = useRetainedValue(turnPresentation, isActive);
     const isTurnActive = effectiveTurnPresentation.isActive;
     const presentStream = useMemo(() => createStreamPresentation(), []);
-    const presentation = useMemo(
+    const toolPresentation = useMemo(
       () =>
         presentStream({
           tail: effectiveStreamItems,
@@ -552,6 +555,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         toolCallDetailLevel,
         isTurnActive,
       ],
+    );
+    const { presentation, groups: completedProcessGroups } = useCompletedProcessPresentation(
+      toolPresentation,
+      isTurnActive,
+      expandedProcessIds,
     );
     const {
       start: historyWindowStart,
@@ -853,7 +861,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       ],
     );
 
-    const renderStreamItemContent = useCallback(
+    const renderStreamItemBody = useCallback(
       (layoutItem: StreamLayoutItem) => {
         const item = layoutItem.item;
         switch (item.kind) {
@@ -901,6 +909,32 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         renderToolCallItem,
         resolvedServerId,
       ],
+    );
+
+    const toggleProcess = useCallback(
+      (id: string) =>
+        setExpandedProcessIds((previous) => {
+          const next = new Set(previous);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        }),
+      [],
+    );
+    const getCompletedProcess = useStableEvent((id: string) => completedProcessGroups.get(id));
+    const renderStreamItemContent = useCallback(
+      (layoutItem: StreamLayoutItem) => {
+        const group = getCompletedProcess(layoutItem.item.id);
+        if (!group) return renderStreamItemBody(layoutItem);
+        const expanded = expandedProcessIds.has(group.id);
+        return (
+          <View>
+            <CompletedProcessToggle id={group.id} expanded={expanded} onToggle={toggleProcess} />
+            {expanded ? renderStreamItemBody(layoutItem) : null}
+          </View>
+        );
+      },
+      [expandedProcessIds, getCompletedProcess, renderStreamItemBody, toggleProcess],
     );
 
     const bottomTurnFooterHost = streamLayout.auxiliaryTurnFooter;
@@ -1080,11 +1114,22 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       expandedInlineToolCallIds.size === 0;
     const historyRowRevision = useMemo(
       () => ({
-        contentById: presentation.historyGroupUpdatesByHostId,
-        displayStateById: expandedToolCallGroupIds,
+        contentById: {
+          has: (id: string) =>
+            completedProcessGroups.has(id) || presentation.historyGroupUpdatesByHostId.has(id),
+        },
+        displayStateById: {
+          has: (id: string) => expandedProcessIds.has(id) || expandedToolCallGroupIds.has(id),
+        },
         globalDisplayState: isMobile,
       }),
-      [expandedToolCallGroupIds, isMobile, presentation.historyGroupUpdatesByHostId],
+      [
+        expandedProcessIds,
+        completedProcessGroups,
+        expandedToolCallGroupIds,
+        isMobile,
+        presentation.historyGroupUpdatesByHostId,
+      ],
     );
 
     const findItems = useMemo(
@@ -1782,4 +1827,36 @@ function StreamItemWrapper({ gapBelow, children }: StreamItemWrapperProps) {
     [gapBelow],
   );
   return <View style={wrapperStyle}>{children}</View>;
+}
+
+const processStyles = StyleSheet.create((theme) => ({
+  toggle: { paddingVertical: theme.spacing[2], alignSelf: "flex-start" },
+  label: { color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
+}));
+
+function CompletedProcessToggle({
+  id,
+  expanded,
+  onToggle,
+}: {
+  id: string;
+  expanded: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const onPress = useCallback(() => onToggle(id), [id, onToggle]);
+  const accessibilityState = useMemo(() => ({ expanded }), [expanded]);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={accessibilityState}
+      onPress={onPress}
+      style={processStyles.toggle}
+    >
+      <Text style={processStyles.label}>
+        {expanded ? "▾ " : "▸ "}
+        {t(expanded ? "agentStream.collapseProcess" : "agentStream.expandProcess")}
+      </Text>
+    </Pressable>
+  );
 }

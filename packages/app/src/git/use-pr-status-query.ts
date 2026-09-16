@@ -1,3 +1,4 @@
+import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
@@ -27,6 +28,7 @@ export function useCheckoutPrStatusQuery({
   const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
   const isConnected = useHostRuntimeIsConnected(serverId);
+  const panelActive = useRetainedPanelActive();
 
   const query = useQuery({
     queryKey: checkoutPrStatusQueryKey(serverId, cwd),
@@ -36,10 +38,9 @@ export function useCheckoutPrStatusQuery({
       }
       return normalizeCheckoutPrStatusPayload(await client.checkoutPrStatus(cwd));
     },
-    enabled: !!client && isConnected && !!cwd && enabled,
-    staleTime: Infinity,
-    // Refetch on mount only after explicit invalidation (e.g. reconnect) — see
-    // useCheckoutStatusQuery for the rationale.
+    enabled: !!client && isConnected && !!cwd && enabled && panelActive,
+    // PR polling is disabled on the host; refresh on visible demand.
+    staleTime: 0,
     refetchOnMount: true,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
@@ -69,6 +70,7 @@ export function useWorkspacePrHint({
   const { t } = useTranslation();
   const client = useHostRuntimeClient(serverId);
   const isConnected = useHostRuntimeIsConnected(serverId);
+  const panelActive = useRetainedPanelActive();
 
   const query = useQuery<CheckoutPrStatusPayload, Error, PrHint | null>({
     queryKey: checkoutPrStatusQueryKey(serverId, cwd),
@@ -78,10 +80,9 @@ export function useWorkspacePrHint({
       }
       return normalizeCheckoutPrStatusPayload(await client.checkoutPrStatus(cwd));
     },
-    enabled: !!client && isConnected && !!cwd && enabled,
-    staleTime: Infinity,
-    // Refetch on mount only after explicit invalidation (e.g. reconnect) — see
-    // useCheckoutStatusQuery for the rationale.
+    enabled: !!client && isConnected && !!cwd && enabled && panelActive,
+    // PR polling is disabled on the host; refresh on visible demand.
+    staleTime: 0,
     refetchOnMount: true,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,

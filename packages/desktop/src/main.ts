@@ -4,6 +4,9 @@ import log from "electron-log/main";
 log.transports.console.level = "info";
 log.initialize({ spyRendererConsole: true });
 
+import { resolvePaseoHome } from "@getpaseo/server";
+import { applyLightweightProfile } from "./settings/lightweight-profile.js";
+
 import { inheritLoginShellEnv } from "./login-shell-env.js";
 
 import path from "node:path";
@@ -111,7 +114,9 @@ const DEV_SERVER_URL = process.env.EXPO_DEV_URL ?? "http://localhost:8081";
 const APP_SCHEME = "paseo";
 const PASEO_DEBUG = process.env.PASEO_DEBUG === "1";
 const DISABLE_SINGLE_INSTANCE_LOCK = process.env.PASEO_DISABLE_SINGLE_INSTANCE_LOCK === "1";
-const APP_NAME = process.env.PASEO_TEST_APP_NAME?.trim() || "Paseo";
+const APP_NAME =
+  process.env.PASEO_TEST_APP_NAME?.trim() ||
+  (app.getVersion().includes("-lite.") ? "Paseo Lite" : "Paseo");
 const DESKTOP_WINDOW_CHROME_MODE = resolveDesktopWindowChromeMode({
   platform: process.platform,
   override: process.env.PASEO_DESKTOP_WINDOW_CONTROLS,
@@ -702,7 +707,7 @@ async function createWindow(
       additionalArguments: [windowChromeModeArgument(DESKTOP_WINDOW_CHROME_MODE)],
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
+      webviewTag: false,
     },
   });
   applyDesktopWindowChromeMode({ win: mainWindow, mode: DESKTOP_WINDOW_CHROME_MODE });
@@ -805,6 +810,8 @@ function ownedDesktopWindow(win: BrowserWindow): OwnedDesktopWindow<AgentDeepLin
 }
 
 desktopWindowOwner = createDesktopWindowOwner<AgentDeepLinkTarget>({
+  singleWindow: true,
+  reloadWindow: (id) => webContents.fromId(id)?.reload(),
   async create(input) {
     const win = await createWindow({
       initialRoute: input.initialRoute,
@@ -961,6 +968,12 @@ async function bootstrap(): Promise<void> {
     },
   });
   ensureNotificationCenterRegistration();
+  if (app.isPackaged && app.getVersion().includes("-lite.")) {
+    await applyLightweightProfile(
+      resolvePaseoHome(),
+      path.join(process.resourcesPath, "lightweight.json"),
+    );
+  }
   registerDaemonManager();
   registerWindowManager({ mode: DESKTOP_WINDOW_CHROME_MODE });
   registerDialogHandlers();

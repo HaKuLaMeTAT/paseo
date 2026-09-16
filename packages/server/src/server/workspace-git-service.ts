@@ -174,7 +174,7 @@ export interface WorkspaceGitRuntimeSnapshot {
 
 export interface WorkspaceGitService {
   registerWorkspace(
-    params: { cwd: string },
+    params: { cwd: string; watchWorkingTree?: boolean },
     listener: WorkspaceGitListener,
   ): WorkspaceGitSubscription;
 
@@ -363,6 +363,8 @@ interface WorkspaceGitServiceDependencies {
 }
 
 interface WorkspaceGitServiceOptions {
+  backgroundFetch?: boolean;
+  forgeStatusPolling?: boolean;
   logger: pino.Logger;
   paseoHome: string;
   worktreesRoot?: string;
@@ -389,6 +391,7 @@ class WorkspaceGitWatcherSubscriptionTimeoutError extends Error {
 interface WorkspaceGitTarget {
   cwd: string;
   listeners: Set<WorkspaceGitListener>;
+  workingTreeListeners: Set<WorkspaceGitListener>;
   workingTreeWatchTarget: WorkingTreeWatchTarget | null;
   debounceTimer: NodeJS.Timeout | null;
   pendingDebounceRequest: WorkspaceGitRefreshRequest | null;
@@ -566,8 +569,12 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     WorkspaceGitAuxiliaryReadCacheEntry<string>
   >({ max: WORKSPACE_GIT_AUXILIARY_CACHE_MAX });
   private readonly checkoutDiffCache = new CheckoutDiffCache(() => this.deps.now().getTime());
+  private readonly backgroundFetch: boolean;
+  private readonly forgeStatusPolling: boolean;
   private watcherErrorCallbackCount = 0;
   constructor(options: WorkspaceGitServiceOptions) {
+    this.backgroundFetch = options.backgroundFetch ?? true;
+    this.forgeStatusPolling = options.forgeStatusPolling ?? true;
     this.logger = options.logger.child({ module: "workspace-git-service" });
     this.paseoHome = options.paseoHome;
     this.worktreesRoot = options.worktreesRoot;
@@ -587,15 +594,22 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   }
 
   registerWorkspace(
-    params: { cwd: string },
+    params: { cwd: string; watchWorkingTree?: boolean },
     listener: WorkspaceGitListener,
   ): WorkspaceGitSubscription {
     this.assertNotDisposed();
     const cwd = resolve(params.cwd);
     const target = this.ensureWorkspaceTarget(cwd);
     target.listeners.add(listener);
+    if (params.watchWorkingTree !== false) {
+      if (target.workingTreeListeners.size === 0 && target.latestSnapshot) {
+        this.scheduleWorkspaceRefresh(target, { scope: "worktree", reason: "working-tree-demand" });
+      }
+      target.workingTreeListeners.add(listener);
+      if (!target.workingTreeWatchTarget) target.observationSetupComplete = false;
+    }
     if (target.listeners.size === 1) {
-      this.startWorkspaceSubscriptionTimers(target);
+      this.updateForgePrStatusPollForTarget(target);
     }
     if (!target.latestSnapshot) {
       this.scheduleInitialWorkspaceRefresh(target);
@@ -905,6 +919,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     cwd = resolve(cwd);
     const target = await this.ensureWorkingTreeWatchTarget(cwd);
     target.listeners.add(onChange);
+    this.scheduleWorkingTreeRefreshes(target, "working-tree-demand");
 
     return {
       repoRoot: target.repoRoot,
@@ -1117,6 +1132,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     const target: WorkspaceGitTarget = {
       cwd,
       listeners: new Set(),
+      workingTreeListeners: new Set(),
       workingTreeWatchTarget: null,
       debounceTimer: null,
       pendingDebounceRequest: null,
@@ -1171,6 +1187,10 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       return;
     }
 
+    if (target.observationReensureTimer) {
+      clearTimeout(target.observationReensureTimer);
+      target.observationReensureTimer = null;
+    }
     target.observationSetupPromise = this.workspaceObservationSetupLimit(async () => {
       if (!this.isActiveObservedWorkspaceTarget(target)) {
         return;
@@ -1188,6 +1208,17 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       })
       .finally(() => {
         target.observationSetupPromise = null;
+        // A diff subscription may arrive while metadata-only setup is awaiting I/O.
+        if (
+          target.observationSetupComplete &&
+          target.workingTreeListeners.size > 0 &&
+          !target.workingTreeWatchTarget
+        ) {
+          target.observationSetupComplete = false;
+          this.scheduleWorkspaceObservationSetup(target);
+        } else if (!target.observationSetupComplete) {
+          this.scheduleWorkspaceObservationRetry(target);
+        }
       });
   }
 
@@ -1196,26 +1227,26 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     if (!this.isActiveObservedWorkspaceTarget(target)) {
       return;
     }
-    const watchCwd = facts.isGit ? facts.worktreeRoot : target.cwd;
-    const workingTreeTargetPromise = this.ensureWorkingTreeWatchTarget(watchCwd);
-    const workingTreeTarget = await workingTreeTargetPromise;
-    if (!this.isActiveObservedWorkspaceTarget(target)) {
-      queueMicrotask(() => this.closeWorkingTreeWatchTargetIfUnused(workingTreeTarget));
-      return;
-    }
-    if (target.workingTreeWatchTarget !== workingTreeTarget) {
-      if (target.workingTreeWatchTarget) {
-        this.removeWorkspaceWorkingTreeLink(target.workingTreeWatchTarget, target.cwd);
+    if (target.workingTreeListeners.size > 0) {
+      const watchCwd = facts.isGit ? facts.worktreeRoot : target.cwd;
+      const workingTreeTarget = await this.ensureWorkingTreeWatchTarget(watchCwd);
+      if (!this.isActiveObservedWorkspaceTarget(target) || target.workingTreeListeners.size === 0) {
+        queueMicrotask(() => this.closeWorkingTreeWatchTargetIfUnused(workingTreeTarget));
+      } else {
+        if (target.workingTreeWatchTarget && target.workingTreeWatchTarget !== workingTreeTarget) {
+          this.removeWorkspaceWorkingTreeLink(target.workingTreeWatchTarget, target.cwd);
+        }
+        target.workingTreeWatchTarget = workingTreeTarget;
+        workingTreeTarget.workspaceKeys.add(target.cwd);
+        if (facts.isGit)
+          await this.promoteWorkingTreeWatchTarget(workingTreeTarget, facts.worktreeRoot);
       }
-      target.workingTreeWatchTarget = workingTreeTarget;
     }
-    workingTreeTarget.workspaceKeys.add(target.cwd);
-
+    if (!this.isActiveObservedWorkspaceTarget(target)) return;
     if (!facts.isGit || !facts.absoluteGitDir) {
       target.observationSetupComplete = true;
       return;
     }
-    await this.promoteWorkingTreeWatchTarget(workingTreeTarget, facts.worktreeRoot);
     const gitDir = facts.absoluteGitDir;
     const repoGitRoot = facts.gitCommonDir ?? (await this.resolveWorkspaceGitRefsRoot(gitDir));
     if (!this.isActiveObservedWorkspaceTarget(target)) {
@@ -1711,9 +1742,13 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
   }
 
   private scheduleWorkingTreeRefreshes(target: WorkingTreeWatchTarget, reason: string): void {
-    for (const workspaceKey of target.workspaceKeys) {
-      const workspaceTarget = this.workspaceTargets.get(workspaceKey);
-      if (workspaceTarget) {
+    for (const workspaceTarget of this.workspaceTargets.values()) {
+      if (!this.isActiveObservedWorkspaceTarget(workspaceTarget)) continue;
+      const facts = workspaceTarget.latestFacts;
+      const watchRoot = facts?.isGit ? facts.worktreeRoot : workspaceTarget.cwd;
+      // Metadata subscribers receive updates while someone else owns the file watch,
+      // but do not retain that watch after the file/diff demand disappears.
+      if (target.workspaceKeys.has(workspaceTarget.cwd) || watchRoot === target.cwd) {
         this.scheduleWorkspaceRefresh(workspaceTarget, { scope: "worktree", reason });
       }
     }
@@ -1784,6 +1819,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
       return;
     }
 
+    if (!this.backgroundFetch) return;
     const fetchWorkspaceTarget = Array.from(repoTarget.workspaceKeys)
       .map((workspaceKey) => this.workspaceTargets.get(workspaceKey))
       .find(
@@ -2352,30 +2388,25 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     }, WORKSPACE_GIT_WATCH_DEBOUNCE_MS);
   }
 
-  private startWorkspaceSubscriptionTimers(target: WorkspaceGitTarget): void {
-    if (!target.observationReensureTimer) {
-      const reensureObservation = () => {
-        if (!this.isActiveObservedWorkspaceTarget(target)) {
-          target.observationReensureTimer = null;
-          return;
-        }
-        target.observationReensureTimer = setTimeout(
-          reensureObservation,
-          WORKSPACE_GIT_OBSERVATION_REENSURE_INTERVAL_MS,
-        );
+  private scheduleWorkspaceObservationRetry(target: WorkspaceGitTarget): void {
+    if (
+      target.observationReensureTimer ||
+      target.observationSetupComplete ||
+      !this.isActiveObservedWorkspaceTarget(target)
+    )
+      return;
+    target.observationReensureTimer = setTimeout(
+      () => {
+        target.observationReensureTimer = null;
         this.scheduleWorkspaceObservationSetup(target);
-      };
-      target.observationReensureTimer = setTimeout(
-        reensureObservation,
+      },
+      WORKSPACE_GIT_OBSERVATION_REENSURE_INTERVAL_MS +
         this.deps.getWorkspaceGitSelfHealPhaseMs(target.cwd),
-      );
-    }
-
-    this.updateForgePrStatusPollForTarget(target);
+    );
   }
 
   private updateForgePrStatusPollForTarget(target: WorkspaceGitTarget): void {
-    if (target.listeners.size === 0) {
+    if (!this.forgeStatusPolling || target.listeners.size === 0) {
       this.stopForgePrStatusPollForTarget(target);
       return;
     }
@@ -3232,10 +3263,12 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     }
 
     target.listeners.delete(listener);
-    if (target.listeners.size > 0) {
-      return;
+    target.workingTreeListeners.delete(listener);
+    if (target.workingTreeListeners.size === 0 && target.workingTreeWatchTarget) {
+      this.removeWorkspaceWorkingTreeLink(target.workingTreeWatchTarget, target.cwd);
+      target.workingTreeWatchTarget = null;
     }
-
+    if (target.listeners.size > 0) return;
     this.removeWorkspaceTarget(target);
   }
 
@@ -3313,6 +3346,7 @@ export class WorkspaceGitServiceImpl implements WorkspaceGitService {
     }
     this.stopForgePrStatusPollForTarget(target);
     target.listeners.clear();
+    target.workingTreeListeners.clear();
   }
 
   private closeWorkingTreeWatchTarget(target: WorkingTreeWatchTarget): void {

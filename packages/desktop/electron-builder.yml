@@ -81,8 +81,10 @@ appImage:
   artifactName: "Paseo-${arch}.${ext}"
 win:
   artifactName: "Paseo-Setup-${version}-${arch}.${ext}"
-  icon: assets/icon.ico
+  icon: assets/icon-windows.ico
   extraResources:
+    - from: assets/icon-windows.ico
+      to: icon.ico
     - from: bin/paseo.cmd
       to: bin/paseo.cmd
   target:
@@ -95,6 +97,9 @@ win:
         - x64
         - arm64
 nsis:
+  installerIcon: assets/icon-windows.ico
+  uninstallerIcon: assets/icon-windows.ico
+  installerHeaderIcon: assets/icon-windows.ico
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true

@@ -2033,7 +2033,7 @@ function ComposerContentImpl({
         isAgentRunning={isAgentRunning}
         hasSendableContent={hasSendableContent}
         isCompact={isCompactLayout}
-        showVoice={mode.showVoice}
+        showVoice={mode.showVoice && !isWeb}
         buttonIconSize={buttonIconSize}
         handleToggleRealtimeVoice={handleToggleRealtimeVoice}
         isConnected={isConnected}

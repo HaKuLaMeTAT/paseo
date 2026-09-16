@@ -139,11 +139,7 @@ import {
   getCurrentProjectRemoveReadiness,
   removeProjectFromHosts,
 } from "@/projects/project-remove";
-import {
-  isWeb as platformIsWeb,
-  isNative as platformIsNative,
-  getIsElectron,
-} from "@/constants/platform";
+import { isWeb as platformIsWeb, isNative as platformIsNative } from "@/constants/platform";
 import { getDesktopHost } from "@/desktop/host";
 import { OpenInFileManagerMenuItem } from "@/workspace/open-in-file-manager/menu-item";
 import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
@@ -546,7 +542,8 @@ function ProjectMenuItems({
     if (!settingsTarget) return;
     router.navigate(buildProjectSettingsRoute(settingsTarget.serverId, settingsTarget.projectId));
   }, [settingsTarget]);
-  const canOpenInNewWindow = getIsElectron() && projectPath.trim().length > 0;
+  const canOpenInNewWindow =
+    typeof getDesktopHost()?.window?.openNew === "function" && projectPath.trim().length > 0;
   const handleOpenInNewWindow = useCallback(() => {
     const trimmedPath = projectPath.trim();
     if (trimmedPath.length === 0) return;

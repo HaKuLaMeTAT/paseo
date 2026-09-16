@@ -36,7 +36,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   },
   daemon: {
     manageBuiltInDaemon: true,
-    keepRunningAfterQuit: false,
+    keepRunningAfterQuit: true,
   },
 };
 
@@ -207,22 +207,7 @@ function hasLegacyRendererOwnedPatch(patch: DesktopSettingsPatch): boolean {
 }
 
 function coerceDocument(input: unknown): PersistedDesktopSettingsDocument {
-  const document = PersistedDocumentSchema.parse(input);
-  if (document.migrations.daemonStopOnQuitDefaultApplied) {
-    return document;
-  }
-
-  return {
-    ...document,
-    settings: {
-      ...document.settings,
-      daemon: {
-        ...document.settings.daemon,
-        keepRunningAfterQuit: DEFAULT_DESKTOP_SETTINGS.daemon.keepRunningAfterQuit,
-      },
-    },
-    migrations: { ...document.migrations, daemonStopOnQuitDefaultApplied: true },
-  };
+  return PersistedDocumentSchema.parse(input);
 }
 
 export function createDesktopSettingsStore({

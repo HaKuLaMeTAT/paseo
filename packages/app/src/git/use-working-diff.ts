@@ -34,7 +34,7 @@ export function useWorkingDiff({
     isLoading: isStatusLoading,
     isError: isStatusError,
     error: statusError,
-  } = useCheckoutStatusQuery({ serverId, cwd });
+  } = useCheckoutStatusQuery({ serverId, cwd, enabled });
   const gitStatus = status && status.isGit ? status : null;
   const isGit = Boolean(gitStatus);
   const notGit = status !== null && !status.isGit && !status.error;

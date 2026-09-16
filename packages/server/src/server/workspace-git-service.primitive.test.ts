@@ -315,6 +315,8 @@ function createGitHubServiceStub(): ForgeService {
 }
 
 interface CreateServiceOptions {
+  backgroundFetch?: boolean;
+  forgeStatusPolling?: boolean;
   subscribe?: ReturnType<typeof vi.fn>;
   getCheckoutSnapshotFacts?: ReturnType<typeof vi.fn>;
   getCheckoutStatus?: ReturnType<typeof vi.fn>;
@@ -410,6 +412,8 @@ function createService(options?: CreateServiceOptions) {
     logger: createLogger() as never,
     paseoHome: "/tmp/paseo-test",
     deps: buildServiceDeps(options),
+    forgeStatusPolling: options?.forgeStatusPolling,
+    backgroundFetch: options?.backgroundFetch,
   });
 }
 
@@ -986,8 +990,8 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
     expect(getCheckoutStatus).toHaveBeenCalledTimes(1);
     expect(subscribe).not.toHaveBeenCalled();
 
-    nowMs = 60_000;
-    await vi.advanceTimersByTimeAsync(60_000);
+    nowMs = 90_000;
+    await vi.advanceTimersByTimeAsync(90_000);
     await flushPromises();
 
     expect(subscribe).toHaveBeenCalledTimes(2);
@@ -1033,6 +1037,31 @@ describe("WorkspaceGitServiceImpl primitive refresh entrypoint", () => {
     expect(getCheckoutStatus).toHaveBeenCalledTimes(callsBeforeStaleCallback);
 
     service.dispose();
+  });
+
+  test("disabled forge polling preserves explicit Git refresh", async () => {
+    const github = createGitHubServiceStub();
+    const getCheckoutStatus = vi.fn(async (cwd: string) => createCheckoutStatus(cwd));
+    let nowMs = Date.parse("2026-04-12T00:00:00.000Z");
+    const service = createService({
+      github,
+      getCheckoutStatus,
+      forgeStatusPolling: false,
+      now: () => new Date(nowMs),
+    });
+    const subscription = service.registerWorkspace({ cwd: REPO_CWD }, vi.fn());
+    try {
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(github.retainCurrentPullRequestStatusPoll).not.toHaveBeenCalled();
+      getCheckoutStatus.mockClear();
+      nowMs += 60_000;
+      await service.refresh(REPO_CWD);
+      expect(getCheckoutStatus).toHaveBeenCalled();
+    } finally {
+      subscription.unsubscribe();
+      await service.dispose();
+    }
   });
 
   test("stale GitHub poll callbacks do not refresh after unsubscribe", async () => {
@@ -2113,6 +2142,178 @@ describe("WorkspaceGitServiceImpl D2 read methods", () => {
     expect(getCheckoutDiff).toHaveBeenCalledTimes(3);
 
     service.dispose();
+  });
+
+  test("healthy metadata observation has no idle maintenance timer", async () => {
+    const subscribe = vi.fn(async () => createAsyncSubscription());
+    const service = createService({ subscribe, forgeStatusPolling: false, backgroundFetch: false });
+    const subscription = service.registerWorkspace(
+      { cwd: REPO_CWD, watchWorkingTree: false },
+      vi.fn(),
+    );
+    try {
+      await vi.waitFor(() => {
+        expect(service.getMetrics().repositoryTargetCount).toBe(1);
+        expect(service.getMetrics().workspaceObservationSetupInFlightCount).toBe(0);
+      });
+      expect(vi.getTimerCount()).toBe(0);
+      const calls = subscribe.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(subscribe).toHaveBeenCalledTimes(calls);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      subscription.unsubscribe();
+      await service.dispose();
+    }
+  });
+
+  test("failed observation retries, then stops its retry timer after recovery", async () => {
+    let available = false;
+    const getCheckoutSnapshotFacts = vi.fn(async (cwd: string) => {
+      if (!available) throw new Error("temporary metadata failure");
+      return createCheckoutFacts(cwd);
+    });
+    const service = createService({
+      getCheckoutSnapshotFacts,
+      forgeStatusPolling: false,
+      backgroundFetch: false,
+    });
+    const subscription = service.registerWorkspace(
+      { cwd: REPO_CWD, watchWorkingTree: false },
+      vi.fn(),
+    );
+    try {
+      await vi.waitFor(() => expect(vi.getTimerCount()).toBe(1));
+      available = true;
+      await vi.advanceTimersByTimeAsync(90_000);
+      await vi.waitFor(() => expect(service.getMetrics().repositoryTargetCount).toBe(1));
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      subscription.unsubscribe();
+      await service.dispose();
+    }
+  });
+
+  test("releasing the last subscription cancels a pending observation retry", async () => {
+    const getCheckoutSnapshotFacts = vi.fn(async () => {
+      throw new Error("unavailable");
+    });
+    const service = createService({
+      getCheckoutSnapshotFacts,
+      forgeStatusPolling: false,
+      backgroundFetch: false,
+    });
+    const subscription = service.registerWorkspace(
+      { cwd: REPO_CWD, watchWorkingTree: false },
+      vi.fn(),
+    );
+    try {
+      await vi.waitFor(() => expect(vi.getTimerCount()).toBe(1));
+      subscription.unsubscribe();
+      const calls = getCheckoutSnapshotFacts.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(getCheckoutSnapshotFacts).toHaveBeenCalledTimes(calls);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      await service.dispose();
+    }
+  });
+
+  test("sidebar metadata observation acquires and releases recursive watching only for diff demand", async () => {
+    const rootUnsubscribe = vi.fn(async () => {});
+    const metadataUnsubscribe = vi.fn(async () => {});
+    const subscribe = vi.fn(async (cwd: string) => ({
+      updateIgnore: createAsyncSubscription().updateIgnore,
+      unsubscribe: cwd === REPO_CWD ? rootUnsubscribe : metadataUnsubscribe,
+    }));
+    const service = createService({ subscribe, forgeStatusPolling: false });
+    const sidebar = service.registerWorkspace({ cwd: REPO_CWD, watchWorkingTree: false }, vi.fn());
+    try {
+      await vi.waitFor(() => expect(service.getMetrics().repositoryTargetCount).toBe(1));
+      expect(subscribe.mock.calls.some(([cwd]) => cwd === REPO_CWD)).toBe(false);
+      expect(service.getMetrics().workingTreeWatchTargetCount).toBe(0);
+      const diff = service.registerWorkspace({ cwd: REPO_CWD }, vi.fn());
+      await vi.waitFor(() => expect(service.getMetrics().workingTreeWatchTargetCount).toBe(1));
+      await flushPromises();
+      diff.unsubscribe();
+      await vi.waitFor(() => expect(rootUnsubscribe).toHaveBeenCalledTimes(1));
+      expect(service.getMetrics().workingTreeWatchTargetCount).toBe(0);
+      expect(service.getMetrics().repositoryTargetCount).toBe(1);
+      expect(metadataUnsubscribe).not.toHaveBeenCalled();
+      const reopened = service.registerWorkspace({ cwd: REPO_CWD }, vi.fn());
+      await vi.waitFor(() => expect(service.getMetrics().workingTreeWatchTargetCount).toBe(1));
+      await flushPromises();
+      reopened.unsubscribe();
+      await vi.waitFor(() => expect(rootUnsubscribe).toHaveBeenCalledTimes(2));
+    } finally {
+      sidebar.unsubscribe();
+      await service.dispose();
+    }
+  });
+
+  test("closing diff while recursive watcher setup is pending releases the late watcher", async () => {
+    const opened = createAsyncSubscription();
+    const pending = createDeferred<ReturnType<typeof createAsyncSubscription>>();
+    const subscribe = vi.fn(async (cwd: string) =>
+      cwd === REPO_CWD ? pending.promise : createAsyncSubscription(),
+    );
+    const service = createService({ subscribe, forgeStatusPolling: false });
+    const sidebar = service.registerWorkspace({ cwd: REPO_CWD, watchWorkingTree: false }, vi.fn());
+    try {
+      await vi.waitFor(() => expect(service.getMetrics().repositoryTargetCount).toBe(1));
+      const diff = service.registerWorkspace({ cwd: REPO_CWD }, vi.fn());
+      await vi.waitFor(() =>
+        expect(subscribe).toHaveBeenCalledWith(REPO_CWD, expect.any(Function), expect.any(Object)),
+      );
+      diff.unsubscribe();
+      pending.resolve(opened);
+      await vi.waitFor(() => expect(opened.unsubscribe).toHaveBeenCalledTimes(1));
+      expect(service.getMetrics().workingTreeWatchTargetCount).toBe(0);
+      expect(service.getMetrics().repositoryTargetCount).toBe(1);
+    } finally {
+      pending.resolve(opened);
+      sidebar.unsubscribe();
+      await service.dispose();
+    }
+  });
+
+  test("an independent file watch refreshes metadata subscribers without retaining its tree", async () => {
+    const getCheckoutWorktreeState = vi.fn(async () => ({
+      isDirty: true,
+      diffStat: { additions: 2, deletions: 0 },
+    }));
+    const service = createService({ getCheckoutWorktreeState, forgeStatusPolling: false });
+    const sidebar = service.registerWorkspace({ cwd: REPO_CWD, watchWorkingTree: false }, vi.fn());
+    try {
+      await vi.waitFor(() => expect(service.getMetrics().repositoryTargetCount).toBe(1));
+      const file = await service.requestWorkingTreeWatch(REPO_CWD, vi.fn());
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(getCheckoutWorktreeState).toHaveBeenCalled();
+      expect(service.peekSnapshot(REPO_CWD)?.git.isDirty).toBe(true);
+      file.unsubscribe();
+      expect(service.getMetrics().workingTreeWatchTargetCount).toBe(0);
+    } finally {
+      sidebar.unsubscribe();
+      await service.dispose();
+    }
+  });
+
+  test("releasing diff demand keeps an independently requested file watch alive", async () => {
+    const service = createService({ forgeStatusPolling: false });
+    const sidebar = service.registerWorkspace({ cwd: REPO_CWD, watchWorkingTree: false }, vi.fn());
+    const file = await service.requestWorkingTreeWatch(REPO_CWD, vi.fn());
+    const diff = service.registerWorkspace({ cwd: REPO_CWD }, vi.fn());
+    try {
+      await flushPromises();
+      diff.unsubscribe();
+      expect(service.getMetrics().workingTreeWatchTargetCount).toBe(1);
+      file.unsubscribe();
+      await vi.waitFor(() => expect(service.getMetrics().workingTreeWatchTargetCount).toBe(0));
+      expect(service.getMetrics().workspaceListenerCount).toBe(1);
+    } finally {
+      sidebar.unsubscribe();
+      await service.dispose();
+    }
   });
 
   test("working tree observation prunes ignored trees but retains trees with tracked files", async () => {

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "features": {
+    "dictation": { "enabled": false },
+    "voiceMode": { "enabled": false }
+  },
+  "daemon": {
+    "relay": { "enabled": true },
+    "browserTools": { "enabled": false },
+    "autoArchiveAfterMerge": false,
+    "serviceProxy": { "enabled": false }
+  },
+  "pluginsEnabled": false,
+  "agents": {
+    "providers": {
+      "claude": { "enabled": true },
+      "codex": { "enabled": true },
+      "opencode": { "enabled": true },
+      "cursor": {
+        "extends": "acp",
+        "label": "Cursor",
+        "command": ["cursor-agent", "acp"],
+        "enabled": true
+      },
+      "copilot": { "enabled": false },
+      "pi": { "enabled": false },
+      "omp": { "enabled": false }
+    }
+  }
+}
