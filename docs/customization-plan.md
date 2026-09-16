@@ -62,7 +62,7 @@
 
 ## 当前部署状态（2026-09-16，Lite.5 服务端补丁）
 
-本机 `paseo` / `paseo-lite` 入口、supervisor 和 worker 已切换到 `/home/syat/.local/share/paseo-lite/0.8.0-lite.5-context.1`，监听 `127.0.0.1:6767`。按用户此前重启授权，在两条会话均空闲时切换；配置与 Relay 身份 SHA256 校验不变，Relay control/data 均已重连。回滚备份：`/home/syat/.local/share/paseo-migrations/20260916-163623-context-reuse`。仅连接 WSL 的客户端可继续使用 Lite.5；公司 Windows 本地 Agent 需要更新包内 daemon，本次目标交付为 `Paseo-Lite-0.8.0-lite.6-x64.zip`。
+本机 `paseo` / `paseo-lite` 入口、supervisor 和 worker 已切换到 `/home/syat/.local/share/paseo-lite/0.8.0-lite.5-context.1`，监听 `127.0.0.1:6767`。按用户此前重启授权，在两条会话均空闲时切换；配置与 Relay 身份 SHA256 校验不变，Relay control/data 均已重连。回滚备份：`/home/syat/.local/share/paseo-migrations/20260916-163623-context-reuse`。仅连接 WSL 的客户端可继续使用 Lite.5；公司 Windows 本地 Agent 需要更新包内 daemon，Windows Lite.6 已完成重新打包，交付 `Paseo-Lite-0.8.0-lite.6-x64.zip`（源码 `dfb6bd90f`）。Windows 隔离端口 18798 启动成功；包内 8 个关键模块与验证构建逐一一致；剪贴板图片粘贴、重载字节一致性及无页面异常检查通过，测试进程已全部清理；ZIP CRC 与归档内 app.asar 一致性校验通过，SHA256 见交付目录 `SHA256SUMS-lite.6.txt`。
 
 本补丁已加载：自定义 Codex Provider 改名转发修复、所有 Provider 共用上下文约束、ACP 首轮传递、Codex 配置恢复路径修正、按需读取/快照字段筛选/重复内容省略工具，以及 MCP 按父会话＋工作区＋任务＋角色复用与并发去重。实现边界和验证证据见[上下文排查记录](codex-context-audit.md)。本地两份 Paseo 技能说明与服务端内置技能已同步。
 
