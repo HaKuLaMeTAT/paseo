@@ -633,6 +633,7 @@ export const en = {
         closeRight: "Close to the right",
         closeOthers: "Close other tabs",
         moveToMain: "Move to main panel",
+        archiveAgent: "Archive session",
         reloadAgent: "Reload agent",
         reloadAgentTooltip: "Reload agent to update skills, MCPs or login status.",
         close: "Close",
@@ -1954,9 +1955,12 @@ export const en = {
     },
   },
   settings: {
+    pluginsDisabled: "Plugins are disabled in this Lite client.",
     title: "Settings",
     loading: "Loading settings...",
     groups: {
+      advanced: "Advanced settings",
+      common: "Common settings",
       app: "App",
       host: "Host",
     },
@@ -2116,6 +2120,8 @@ export const en = {
       },
     },
     metadataGeneration: {
+      liteDescription:
+        "Automatic workspace naming is disabled in Lite. New names use the first message without an extra model request. These model preferences apply to explicitly requested metadata generation.",
       title: "Metadata generation",
       description:
         "Choose the model Paseo uses for workspace titles, branch names, commit messages, and pull request drafts",
@@ -2145,10 +2151,12 @@ export const en = {
       defaultSend: {
         label: "Default send",
         descriptions: {
-          interrupt: "When the agent is running, Enter interrupts. Command/Ctrl+Enter queues.",
+          interrupt:
+            "When the agent is running, Enter interrupts. Command/Ctrl+Enter queues. Alt+Enter inserts a new line.",
           steer:
-            "When the agent is running, Enter steers the active turn. Command/Ctrl+Enter queues.",
-          queue: "When the agent is running, Enter queues. Command/Ctrl+Enter submits.",
+            "When the agent is running, Enter steers the active turn. Command/Ctrl+Enter queues. Alt+Enter inserts a new line.",
+          queue:
+            "When the agent is running, Enter queues. Command/Ctrl+Enter submits. Alt+Enter inserts a new line.",
         },
         options: {
           interrupt: "Interrupt",

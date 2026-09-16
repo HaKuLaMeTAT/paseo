@@ -67,6 +67,7 @@ import {
 const ComposerTextInput = withUnistyles(EditingTextInput, (theme) => ({
   placeholderTextColor: theme.colors.surface4,
 }));
+import { resolveComposerLineBreak } from "./state";
 import {
   resolveSendTooltipLabel,
   resolveSubmitAccessibilityLabel,
@@ -199,6 +200,7 @@ type WebTextInputKeyPressEvent = NativeSyntheticEvent<
     metaKey?: boolean;
     ctrlKey?: boolean;
     shiftKey?: boolean;
+    altKey?: boolean;
     // Web-only: present on DOM KeyboardEvent during IME composition (CJK input).
     isComposing?: boolean;
     keyCode?: number;
@@ -381,6 +383,7 @@ function SendButtonContent({
 }
 
 interface DesktopKeyPressContext {
+  replaceText: MessageInputRef["replaceText"];
   onKeyPressCallback: ((event: ComposerKeyPressEvent) => boolean) | undefined;
   input: ComposerKeyPressEvent["input"];
   submitOnEnter: boolean;
@@ -398,6 +401,12 @@ function handleDesktopKeyPressImpl(
   ctx: DesktopKeyPressContext,
 ): void {
   if (isImeComposingKeyboardEvent(event.nativeEvent)) return;
+  const lineBreak = resolveComposerLineBreak(event.nativeEvent, ctx.input);
+  if (lineBreak) {
+    event.preventDefault();
+    ctx.replaceText(lineBreak.text, lineBreak.selection);
+    return;
+  }
 
   if (ctx.onKeyPressCallback) {
     const handled = ctx.onKeyPressCallback({
@@ -717,7 +726,7 @@ function VoiceButtonTooltip({
   dictationToggleKeys: ShortcutChord | null | undefined;
 }) {
   const shortcut = isRealtimeVoiceForCurrentAgent ? voiceMuteToggleKeys : dictationToggleKeys;
-  if (!visible) return null;
+  if (!visible || isWeb) return null;
   return (
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
       <TooltipTrigger
@@ -1599,6 +1608,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     function handleDesktopKeyPress(event: WebTextInputKeyPressEvent) {
       if (!shouldHandleWebKeyPress) return;
       handleDesktopKeyPressImpl(event, {
+        replaceText,
         onKeyPressCallback,
         input: getComposerInputSnapshot(
           textInputRef.current,

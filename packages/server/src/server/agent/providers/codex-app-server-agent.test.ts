@@ -691,6 +691,38 @@ process.stdin.on("data", (chunk) => {
 }
 
 describe("Codex app-server provider", () => {
+  test("Lite bounds retained tool output while preserving role instructions and one user input", async () => {
+    const requests: Array<{ method: string; params: unknown }> = [];
+    const session = createSession({
+      thinkingOptionId: "medium",
+      systemPrompt: "ROLE_RULE",
+      daemonAppendSystemPrompt: "CROSS_REVIEW_RULE",
+    });
+    session.currentThreadId = null;
+    session.activeForegroundTurnId = null;
+    session.client = {
+      request: vi.fn(async (method: string, params: unknown) => {
+        requests.push({ method, params });
+        if (method === "thread/start") return { thread: { id: "lite-thread" } };
+        if (method === "turn/start") return {};
+        throw new Error(`Unexpected request: ${method}`);
+      }),
+    };
+    await session.startTurn("only this new message");
+    for (const method of ["thread/start", "turn/start"]) {
+      const params = requests.find((r) => r.method === method)?.params as Record<string, unknown>;
+      expect(params.config).toMatchObject({ tool_output_token_limit: 4000 });
+      expect(params.developerInstructions).toContain("ROLE_RULE");
+      expect(params.developerInstructions).toContain("CROSS_REVIEW_RULE");
+      expect(params.developerInstructions).toContain("When output is truncated");
+    }
+    const turns = requests.filter((r) => r.method === "turn/start");
+    expect(turns).toHaveLength(1);
+    expect(turns[0].params).toMatchObject({
+      input: [{ type: "text", text: "only this new message" }],
+    });
+  });
+
   test("getAvailableModes includes auto-review when the Codex version supports it", async () => {
     const session = createSession({}, { autoReviewEnabled: true });
 
@@ -1799,6 +1831,7 @@ describe("Codex app-server provider", () => {
       OPENAI_BASE_URL: "https://custom-relay.example.com",
     });
     expect(capturedThreadStartConfig(capturedRequests)).toEqual({
+      tool_output_token_limit: 4000,
       model_provider: "codex-iisb",
       model_providers: {
         "codex-iisb": {
@@ -1819,6 +1852,7 @@ describe("Codex app-server provider", () => {
     );
 
     expect(capturedThreadStartConfig(capturedRequests)).toEqual({
+      tool_output_token_limit: 4000,
       model_provider: "codex-custom",
       model_providers: {
         "codex-custom": expect.objectContaining({
@@ -2244,7 +2278,7 @@ describe("Codex app-server provider", () => {
     );
   });
 
-  test("maps image prompt blocks to Codex localImage input", async () => {
+  test("passes image bytes directly to Codex without an intermediate file", async () => {
     const input = await codexAppServerTurnInputFromPrompt(
       [
         { type: "text", text: "hello" },
@@ -2252,14 +2286,17 @@ describe("Codex app-server provider", () => {
       ],
       logger,
     );
-    const localImage = input.find((item) => (item as { type?: string })?.type === "localImage") as
-      | { type: "localImage"; path?: string }
-      | undefined;
-    expect(localImage?.path).toBeTypeOf("string");
-    if (localImage?.path) {
-      expect(existsSync(localImage.path)).toBe(true);
-      rmSync(localImage.path, { force: true });
-    }
+    expect(input).toEqual([
+      { type: "text", text: "hello", text_elements: [] },
+      { type: "image", url: `data:image/png;base64,${ONE_BY_ONE_PNG_BASE64}` },
+    ]);
+    const url = `data:image/png;base64,${ONE_BY_ONE_PNG_BASE64}`;
+    await expect(
+      codexAppServerTurnInputFromPrompt(
+        [{ type: "image", mimeType: "image/png", data: url }],
+        logger,
+      ),
+    ).resolves.toEqual([{ type: "image", url }]);
   });
 
   test("maps github_pr prompt attachments to Codex text input", async () => {
@@ -4829,7 +4866,14 @@ describe("Codex app-server provider", () => {
     expect(session.currentThreadId).toBe("archived-thread-id");
     expect(requests).toEqual([
       { method: "thread/loaded/list", params: {} },
-      { method: "thread/resume", params: { threadId: "archived-thread-id" } },
+      {
+        method: "thread/resume",
+        params: {
+          threadId: "archived-thread-id",
+          config: { tool_output_token_limit: 4000 },
+          developerInstructions: expect.stringContaining("When output is truncated"),
+        },
+      },
     ]);
   });
 

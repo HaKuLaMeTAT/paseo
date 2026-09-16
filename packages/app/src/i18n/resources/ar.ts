@@ -226,6 +226,8 @@ export const ar: TranslationResources = {
     },
   },
   agentStream: {
+    expandProcess: en.agentStream.expandProcess,
+    collapseProcess: en.agentStream.collapseProcess,
     empty: "ابدأ الدردشة مع هذا الوكيل...",
     scrollToBottom: "قم بالتمرير إلى الأسفل",
     historyLoadFailed: "تعذر تحميل سجل الوكيل",
@@ -634,6 +636,7 @@ export const ar: TranslationResources = {
         closeRight: "قريب من اليمين",
         closeOthers: "أغلق علامات التبويب الأخرى",
         moveToMain: "Move to main panel",
+        archiveAgent: en.workspace.tabs.menu.archiveAgent,
         reloadAgent: "إعادة تحميل الوكيل",
         reloadAgentTooltip: "قم بإعادة تحميل الوكيل لتحديث المهارات أو MCPs أو حالة تسجيل الدخول.",
         close: "يغلق",
@@ -1927,9 +1930,12 @@ export const ar: TranslationResources = {
     },
   },
   settings: {
+    pluginsDisabled: en.settings.pluginsDisabled,
     title: "إعدادات",
     loading: "جارٍ تحميل الإعدادات...",
     groups: {
+      common: en.settings.groups.common,
+      advanced: en.settings.groups.advanced,
       app: "برنامج",
       host: "Host",
     },
@@ -1993,6 +1999,7 @@ export const ar: TranslationResources = {
     },
     plugins: pluginSettings.ar,
     metadataGeneration: {
+      liteDescription: en.settings.metadataGeneration.liteDescription,
       title: "إنشاء البيانات الوصفية",
       description:
         "اختر النموذج الذي يستخدمه Paseo لعناوين مساحات العمل وأسماء الفروع ورسائل الالتزام ومسودات طلبات السحب",

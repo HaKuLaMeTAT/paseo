@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Text } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
+  Archive,
   ArrowLeftToLine,
   ArrowRightToLine,
   Copy,
@@ -23,6 +24,7 @@ import type { WorkspaceTabMenuEntry } from "@/screens/workspace/workspace-tab-me
 import type { Theme } from "@/styles/theme";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
+const ThemedArchive = withUnistyles(Archive);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedRotateCw = withUnistyles(RotateCw);
 const ThemedArrowLeftToLine = withUnistyles(ArrowLeftToLine);
@@ -49,6 +51,8 @@ function MobileTabDropdownMenuItem({
     switch (entry.icon) {
       case "copy":
         return <ThemedCopy size={16} uniProps={mutedColorMapping} />;
+      case "archive":
+        return <ThemedArchive size={16} uniProps={mutedColorMapping} />;
       case "rotate-cw":
         return <ThemedRotateCw size={16} uniProps={mutedColorMapping} />;
       case "arrow-left-to-line":

@@ -1073,6 +1073,7 @@ export async function createPaseoDaemon(
     wsServer?.broadcast(wrapSessionMessage(message));
   };
   const workspaceAutoName = new WorkspaceAutoName({
+    automaticNaming: false,
     agentManager,
     workspaceRegistry,
     workspaceGitService,

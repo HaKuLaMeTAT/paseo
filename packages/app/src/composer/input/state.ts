@@ -192,3 +192,17 @@ export async function stopRealtimeVoice(ctx: StopRealtimeVoiceContext): Promise<
 
   await ctx.voice.stopVoice();
 }
+
+/** Alt+Enter is handled before autocomplete so it never sends or selects a command. */
+export function resolveComposerLineBreak(
+  event: { key: string; altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean },
+  input: { text: string; selection: { start: number; end: number } },
+) {
+  if (event.key !== "Enter" || !event.altKey || event.ctrlKey || event.metaKey) return null;
+  const { text, selection } = input;
+  const cursor = selection.start + 1;
+  return {
+    text: text.slice(0, selection.start) + "\n" + text.slice(selection.end),
+    selection: { start: cursor, end: cursor },
+  };
+}

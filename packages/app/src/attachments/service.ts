@@ -100,28 +100,13 @@ export async function encodeAttachmentsForSend(
   }
 
   const store = await getAttachmentStore();
-  const encoded = await Promise.all(
-    attachments.map(async (attachment) => {
-      try {
-        const data = await store.encodeBase64({ attachment });
-        return {
-          data,
-          mimeType: attachment.mimeType,
-        };
-      } catch (error) {
-        console.error("[attachments] Failed to encode attachment for send", {
-          id: attachment.id,
-          error,
-        });
-        return null;
-      }
-    }),
+  // Never send the text alone when an attached image could not be read.
+  return await Promise.all(
+    attachments.map(async (attachment) => ({
+      data: await store.encodeBase64({ attachment }),
+      mimeType: attachment.mimeType,
+    })),
   );
-
-  const valid = encoded.filter(
-    (entry): entry is { data: string; mimeType: string } => entry !== null,
-  );
-  return valid.length > 0 ? valid : undefined;
 }
 
 export async function resolveAttachmentPreviewUrl(attachment: AttachmentMetadata): Promise<string> {

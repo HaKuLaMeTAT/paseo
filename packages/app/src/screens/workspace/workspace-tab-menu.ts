@@ -16,6 +16,7 @@ export interface WorkspaceTabMenuLabels {
   closeLeft: string;
   closeRight: string;
   closeOthers: string;
+  archiveAgent?: string;
   reloadAgent: string;
   reloadAgentTooltip: string;
   close: string;
@@ -44,6 +45,7 @@ export type WorkspaceTabMenuEntry =
       label: string;
       icon?:
         | "copy"
+        | "archive"
         | "rotate-cw"
         | "arrow-left-to-line"
         | "arrow-right-to-line"
@@ -72,6 +74,7 @@ interface BuildWorkspaceTabMenuEntriesInput {
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
   onCopyFilePath: (path: string) => Promise<void> | void;
+  onArchiveAgent?: (agentId: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
@@ -89,6 +92,7 @@ interface BuildWorkspaceDesktopTabActionsInput {
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
   onCopyFilePath: (path: string) => Promise<void> | void;
+  onArchiveAgent?: (agentId: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
@@ -176,6 +180,7 @@ export function buildWorkspaceTabMenuEntries(
     onCopyAgentId,
     onCopyTerminalId,
     onCopyFilePath,
+    onArchiveAgent,
     onReloadAgent,
     onRenameTab,
     onCloseTab,
@@ -307,6 +312,19 @@ export function buildWorkspaceTabMenuEntries(
       },
     });
   }
+  if (tab.target.kind === "agent" && onArchiveAgent) {
+    const { agentId } = tab.target;
+    entries.push({
+      kind: "item",
+      key: "archive-agent",
+      icon: "archive",
+      label: labels.archiveAgent ?? i18n.t("workspace.tabs.menu.archiveAgent"),
+      testID: `${menuTestIDBase}-archive-agent`,
+      onSelect: () => {
+        void onArchiveAgent(agentId);
+      },
+    });
+  }
   entries.push({
     kind: "item",
     key: "close",
@@ -337,6 +355,7 @@ export function buildWorkspaceDesktopTabActions(
       onCopyAgentId: input.onCopyAgentId,
       onCopyTerminalId: input.onCopyTerminalId,
       onCopyFilePath: input.onCopyFilePath,
+      onArchiveAgent: input.onArchiveAgent,
       onReloadAgent: input.onReloadAgent,
       onRenameTab: input.onRenameTab,
       onCloseTab: input.onCloseTab,

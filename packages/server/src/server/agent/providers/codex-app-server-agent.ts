@@ -139,6 +139,14 @@ function isCodexAlreadyUnarchivedError(error: unknown, threadId: string): boolea
 const TURN_START_TIMEOUT_MS = 90 * 1000;
 const INTERRUPT_TIMEOUT_MS = 2_000;
 const CODEX_PROVIDER = "codex" as const;
+// Bound retained tool output in Lite sessions; role instructions remain authoritative.
+const CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS =
+  "Keep tool results concise: search first, read relevant ranges, and summarize large JSON/logs " +
+  "instead of dumping whole files. Start with about 2000 output tokens per shell/search call; " +
+  "increase only for needed evidence. Do not reread unchanged documents already in context. " +
+  "When output is truncated, retrieve the relevant omitted range before drawing conclusions. " +
+  "Preserve required role instructions, independent reviews and cross-review stages.";
+
 // Codex treats most app-server client names as the model-request originator.
 // This reserved Codex name is non-originating, so requests keep Codex's default
 // CLI identity instead of showing up as Paseo in provider usage logs.
@@ -3137,14 +3145,14 @@ type CodexAppServerUserInput =
       text_elements: CodexTextElement[];
     }
   | {
-      type: "localImage";
-      path: string;
+      type: "image";
+      url: string;
     }
   | CodexSkillPromptBlock;
 
 export async function codexAppServerTurnInputFromPrompt(
   prompt: CodexPromptInput,
-  logger: Logger,
+  _logger: Logger,
 ): Promise<CodexAppServerUserInput[]> {
   if (typeof prompt === "string") {
     return [toCodexTextInput(prompt)];
@@ -3164,19 +3172,14 @@ export async function codexAppServerTurnInputFromPrompt(
       continue;
     }
     if (block.type === "image") {
-      try {
-        const filePath = materializeProviderImage({
-          data: block.data,
-          mimeType: block.mimeType,
-        }).path;
-        output.push({ type: "localImage", path: filePath });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn({ message }, "Failed to write Codex image attachment");
-        output.push({
-          ...toCodexTextInput(`User attached image (failed to write temp file): ${message}`),
-        });
-      }
+      // App-server supports image data URLs. Avoid a second filesystem round trip,
+      // which can change attachment bytes on managed Windows endpoints.
+      output.push({
+        type: "image",
+        url: block.data.startsWith("data:")
+          ? block.data
+          : `data:${block.mimeType};base64,${block.data}`,
+      });
       previousTextBlock = false;
       continue;
     }
@@ -3681,6 +3684,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       match.developer_instructions,
       this.config.systemPrompt,
       this.config.daemonAppendSystemPrompt,
+      CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS,
     );
     if (developerInstructions) settings.developer_instructions = developerInstructions;
     if (this.config.model) settings.model = this.config.model;
@@ -3898,6 +3902,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const developerInstructions = composeSystemPromptParts(
       this.config.systemPrompt,
       this.config.daemonAppendSystemPrompt,
+      CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS,
     );
     if (developerInstructions) {
       params.developerInstructions = developerInstructions;
@@ -4054,6 +4059,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const developerInstructions = composeSystemPromptParts(
       this.config.systemPrompt,
       this.config.daemonAppendSystemPrompt,
+      CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS,
     );
     if (developerInstructions) {
       params.developerInstructions = developerInstructions;
@@ -5138,6 +5144,7 @@ export class CodexAppServerAgentSession implements AgentSession {
     const developerInstructions = composeSystemPromptParts(
       this.config.systemPrompt,
       this.config.daemonAppendSystemPrompt,
+      CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS,
     );
     const params: Record<string, unknown> = {
       model,
@@ -5157,7 +5164,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   }
 
   private buildCodexInnerConfig(): Record<string, unknown> | null {
-    const innerConfig: Record<string, unknown> = {};
+    const innerConfig: Record<string, unknown> = { tool_output_token_limit: 4000 };
     Object.assign(innerConfig, this.providerOptions);
     if (this.deps.customCodexConfig) {
       Object.assign(innerConfig, this.deps.customCodexConfig);

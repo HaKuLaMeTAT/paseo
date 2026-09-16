@@ -226,6 +226,8 @@ export const ko: TranslationResources = {
     },
   },
   agentStream: {
+    expandProcess: en.agentStream.expandProcess,
+    collapseProcess: en.agentStream.collapseProcess,
     empty: "이 에이전트와 대화를 시작하세요...",
     scrollToBottom: "맨 아래로 스크롤",
     historyLoadFailed: "에이전트 기록을 로드할 수 없습니다.",
@@ -635,6 +637,7 @@ export const ko: TranslationResources = {
         closeRight: "오른쪽 탭 닫기",
         closeOthers: "다른 탭 닫기",
         moveToMain: "기본 패널로 이동",
+        archiveAgent: en.workspace.tabs.menu.archiveAgent,
         reloadAgent: "에이전트 다시 로드",
         reloadAgentTooltip:
           "스킬, MCP 또는 로그인 상태를 업데이트하려면 에이전트를 다시 로드하세요.",
@@ -1937,9 +1940,12 @@ export const ko: TranslationResources = {
     },
   },
   settings: {
+    pluginsDisabled: en.settings.pluginsDisabled,
     title: "설정",
     loading: "설정 불러오는 중...",
     groups: {
+      common: en.settings.groups.common,
+      advanced: en.settings.groups.advanced,
       app: "앱",
       host: "호스트",
     },
@@ -2003,6 +2009,7 @@ export const ko: TranslationResources = {
     },
     plugins: pluginSettings.ko,
     metadataGeneration: {
+      liteDescription: en.settings.metadataGeneration.liteDescription,
       title: "메타데이터 생성",
       description:
         "워크스페이스 제목, 브랜치 이름, 커밋 메시지 및 풀 리퀘스트 초안에 사용할 모델을 선택하세요",

@@ -51,7 +51,12 @@ export function getMainWindowChromeOptions(input: {
   mode: DesktopWindowChromeMode;
 }): Pick<
   Electron.BrowserWindowConstructorOptions,
-  "titleBarStyle" | "trafficLightPosition" | "frame" | "titleBarOverlay" | "autoHideMenuBar"
+  | "titleBarStyle"
+  | "trafficLightPosition"
+  | "frame"
+  | "thickFrame"
+  | "titleBarOverlay"
+  | "autoHideMenuBar"
 > {
   if (input.mode === "native-mac") {
     return {
@@ -63,6 +68,7 @@ export function getMainWindowChromeOptions(input: {
 
   return {
     frame: false,
+    ...(input.mode === "custom-windows" ? { thickFrame: false } : {}),
     autoHideMenuBar: true,
   };
 }

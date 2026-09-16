@@ -23,6 +23,7 @@ type WorkspaceNameGenerator = typeof generateBranchNameFromFirstAgentContext;
 type CurrentSelection = GenerateBranchNameFromFirstAgentContextOptions["currentSelection"] | null;
 
 interface WorkspaceAutoNameOptions {
+  automaticNaming?: boolean;
   agentManager: AgentManager;
   workspaceRegistry: Pick<WorkspaceRegistry, "update">;
   workspaceGitService: WorkspaceGitService;
@@ -40,6 +41,7 @@ interface ScheduleContext {
 }
 
 export class WorkspaceAutoName {
+  private readonly automaticNaming: boolean;
   private readonly agentManager: AgentManager;
   private readonly workspaceRegistry: Pick<WorkspaceRegistry, "update">;
   private readonly workspaceGitService: WorkspaceGitService;
@@ -52,6 +54,7 @@ export class WorkspaceAutoName {
   private readonly generateWorkspaceName: WorkspaceNameGenerator;
 
   constructor(options: WorkspaceAutoNameOptions) {
+    this.automaticNaming = options.automaticNaming ?? true;
     this.agentManager = options.agentManager;
     this.workspaceRegistry = options.workspaceRegistry;
     this.workspaceGitService = options.workspaceGitService;
@@ -199,6 +202,12 @@ export class WorkspaceAutoName {
     firstAgentContext: FirstAgentContext;
     currentSelection: CurrentSelection;
   }): Promise<GeneratedWorkspaceName | null> {
+    if (!this.automaticNaming) {
+      return Promise.resolve({
+        title: resolveFirstAgentPromptTitle(input.firstAgentContext),
+        branch: null,
+      });
+    }
     return this.generateWorkspaceName({
       agentManager: this.agentManager,
       cwd: input.cwd,

@@ -228,6 +228,8 @@ export const ru: TranslationResources = {
     },
   },
   agentStream: {
+    expandProcess: en.agentStream.expandProcess,
+    collapseProcess: en.agentStream.collapseProcess,
     empty: "Начните общаться с этим агентом...",
     scrollToBottom: "Прокрутить вниз",
     historyLoadFailed: "Не удалось загрузить историю агента",
@@ -641,6 +643,7 @@ export const ru: TranslationResources = {
         closeRight: "Закрыть вкладки справа",
         closeOthers: "Закрыть другие вкладки",
         moveToMain: "Переместить на основную панель",
+        archiveAgent: en.workspace.tabs.menu.archiveAgent,
         reloadAgent: "Перезагрузить агента",
         reloadAgentTooltip: "Перезагрузите агента, чтобы обновить навыки, MCP или статус входа.",
         close: "Закрыть",
@@ -1960,9 +1963,12 @@ export const ru: TranslationResources = {
     },
   },
   settings: {
+    pluginsDisabled: en.settings.pluginsDisabled,
     title: "Настройки",
     loading: "Загрузка настроек...",
     groups: {
+      common: en.settings.groups.common,
+      advanced: en.settings.groups.advanced,
       app: "Приложение",
       host: "Хост",
     },
@@ -2026,6 +2032,7 @@ export const ru: TranslationResources = {
     },
     plugins: pluginSettings.ru,
     metadataGeneration: {
+      liteDescription: en.settings.metadataGeneration.liteDescription,
       title: "Генерация метаданных",
       description:
         "Выберите модель, которую Paseo будет использовать для названий рабочих пространств и веток, сообщений коммитов и черновиков PR",

@@ -60,6 +60,59 @@
 
 当前未决：最明显的卡顿场景、已有插件/调度的使用情况，以及两台主机实测的资源基线。
 
+## 当前部署状态（2026-09-16，Lite.5）
+
+用户确认公司加密终端已可传图片，并授权重启 WSL、提交推送。本机 `paseo` / `paseo-lite` 入口、supervisor 和 worker 已切换到 `/home/syat/.local/share/paseo-lite/0.8.0-lite.5`，正式服务监听 `127.0.0.1:6767`。沿用现有 `~/.paseo`，配置与 Relay 身份不变；回滚备份位于 `/home/syat/.local/share/paseo-migrations/20260916-160235-lite5`。重启前有 1 个运行中会话，已按授权停服切换。
+
+以下各批中“未切换/待重启”的说明记录的是当时交付状态；现在统一以本节为准。Lite.3 的自动命名关闭、Lite.4 的 Codex 上下文预算及 Lite.5 的 Codex 图片直传代码均已由新版服务加载。旧会话已有上下文不会自动清空，旧损坏图片附件仍须重新粘贴。
+
+## 加密终端粘贴图片修复（lite.5，2026-09-16）
+
+用户确认：公司 Windows 有终端文件加密；同一截图以 Ctrl+V 粘贴，Codex App 正常，Paseo 附件预览空白且模型报告文件头 `%TSD-Header-###%`。尚未直接读取公司失败附件，因此不能声称已在企业加密环境复现。
+
+代码确认旧路径：剪贴板 Blob → Electron 写临时 `.png` → 再读文件 → Base64 上传。修复为剪贴板/blob/bytes/data URL 使用已有 IndexedDB Blob 存储，预览与上传使用同一份字节；旧 desktop-file 元数据和手选文件 URI 继续路由原存储，清理覆盖两套存储。没有修改企业加密设置，也没有解密旧附件。
+
+桌面上传前用实际图片解码校验，无法解码时阻止发送并提示重新截图粘贴；附件编码异常不再被静默过滤成仅文本发送，草稿由现有失败恢复路径保留。
+
+Codex 适配器改用原生 `image` + data URL 输入，避免 provider 再写临时图片。已通过本机 Codex 0.154.0 `app-server generate-ts` 生成的 v2/UserInput 协议定义确认支持；这不等于已审阅闭源 Codex Desktop 的内部实现。PNG 字节与 data URL 透传有回归测试。
+
+验证：附件相关 10 项、Codex adapter 152 项测试通过，全工作区类型检查与修改文件 lint 通过。Windows 实际 ClipboardEvent 粘贴 240×80 PNG（3101 字节），预览正常，IndexedDB 存储及页面重载后字节完全一致、可解码，无页面异常；截图 `.artifacts/windows/lite5-clipboard.png`。未发起付费模型调用，未在公司加密终端直接验证。
+
+交付 `.artifacts/windows/release/Paseo-Lite-0.8.0-lite.5-x64.zip`，ZIP CRC 通过，SHA256 校验文件同目录。公司端先使用新客户端、删除旧坏附件后重新粘贴，即可验证客户端修复；WSL 暂不需要重启来验证这一部分。Codex 原生 image 直传需要新版 daemon，WSL 新目录 `/home/syat/.local/share/paseo-lite/0.8.0-lite.5` 已准备，正式 6767 服务未切换。测试 Windows 程序和它启动的临时 daemon 已清理。
+
+## 输入与 Codex 上下文优化（lite.4，2026-09-16）
+
+- 客户端 Alt+Enter 在光标/选区处显式插入换行，优先于补全与发送，输入法组合事件不拦截；Shift+Enter 保留兼容，Enter 和 Ctrl/Command+Enter 发送语义不变。中英文通用设置提示同步更新。
+- Codex adapter 默认单个工具结果历史预算 4000 token，覆盖创建、恢复与发送配置；追加简短按需读取提示，要求对截断证据继续定向读取。正式角色指令和独立/交叉复核完整保留。未修改 Codex 全局设置、模型窗口、思考级别和压缩阈值。
+- 排查发现历史样本存在多次长文档/大 JSON 整篇读取和重复读取；没有证明是窗口变小或 Paseo 每轮重发整个 UI 历史。样本范围及局限见 [Codex 上下文排查](codex-context-audit.md)。具体问题会话尚待用户指认；未做付费模型 A/B，不能量化收益。
+- 验证：输入状态 20 项、Codex adapter 152 项测试通过，全工作区类型检查和修改文件 lint 通过；server、Electron 和 Expo 构建通过。Windows 实际草稿输入验证 Alt+Enter 选区换行通过，无发送；截图 `.artifacts/windows/lite4-alt-enter.png`，测试进程已清理。
+- 交付 `.artifacts/windows/release/Paseo-Lite-0.8.0-lite.4-x64.zip`，ZIP CRC 通过，校验文件同目录 `SHA256SUMS-lite.4.txt`。归档内版本和工具预算设置均已核验。
+- WSL `/home/syat/.local/share/paseo-lite/0.8.0-lite.4` 已准备；正式 daemon 仍为 lite.2，未切换/重启。服务端节省上下文与自动命名关闭尚未在家里 WSL 生效，须经用户同意切换并重新加载会话。已有长上下文不会立即缩小。
+
+## 设置与运行路径收敛（lite.3，2026-09-16）
+
+用户授权：设置分为常用与高级、缩小 Windows 外边框、标签右键归档 agent、排查额外 token；确认默认关闭自动 AI 标题/分支命名。
+
+- 常用保留通用、外观、通知、权限，以及主机概览、项目、连接、配对、Agent 和 Provider；布局、编辑器、快捷键、集成、诊断、关于、元数据、工作区、用量、终端归入可展开的高级设置。直达高级页时自动展开。
+- 移除插件设置入口及其页面运行挂载，旧链接显示已停用说明；移除语音播放诊断及桌面输入框残留麦克风；Web/桌面使用独立禁用实现，不再挂载听写订阅或语音运行时，原版手机 App 不变。Electron 移除内嵌浏览器的 IPC、捕获、键盘、弹窗和 profile 初始化路径，webview 继续禁止。
+- Windows frameless 窗口关闭 thickFrame，消除系统厚外沿；保留自绘标题栏与窗口控制。Windows 实机验证窗口外框/客户区均为 1200 × 800，左边缘 WM_NCHITTEST 返回 HTLEFT（10）；最大化与还原通过。尚未人工拖拽逐边验证。
+- Agent 标签右键菜单增加明确的归档操作；仅 agent 有此项，运行中的 agent 使用已有确认框；归档成功后清理对应标签，失败沿用已有回滚与提示。
+- 默认停止自动工作区模型命名，使用首条消息摘要，保留现有分支名。手动改名及明确点击的元数据生成不变。
+
+### Token 排查边界
+
+自动工作区命名原来会启动内部模型会话，并在结构化输出失败时重试（最多两次）；候选模型失败还可继续尝试其他候选。该后台路径在 lite.3 关闭，不能把主聊天选择的模型当成全部调用来源。
+
+检查本机 WSL 配置与可解析 daemon 日志：未找到可确认的重复自动命名调用记录；没有调度任务，语音和插件关闭，AW 已退役。这不等于所有历史或公司主机都没有额外调用；未取得公司侧完整模型用量与账单，不能量化节省比例。
+
+主机追加角色指令约 1518 字符，属于模型输入的一部分，不能等同于 1518 token。遵循用户要求保留正式 Paseo 角色/复核逻辑，不削掉小巴小保的独立轮或交叉轮。过程折叠只影响显示；读取状态、Git 刷新与 Relay 心跳本身不是模型调用。手动提交/PR 文案生成及用户授权的多 agent 复核仍会消耗 token。
+
+验证：全工作区类型检查、修改文件 lint、Electron/Expo/server 构建通过；菜单 10、窗口 14、自动命名 2 项测试通过。Windows 隔离配置验证常用/高级展开、窗口控制、daemon 启动通过，无页面异常；测试进程已清理，未安装到家里 Windows。
+
+交付：`.artifacts/windows/release/Paseo-Lite-0.8.0-lite.3-x64.zip`（188204217 字节），ZIP CRC 通过，SHA256 `07936fd68ee3c806a7a37bf9ec2a77828cb0a978b9ddfc3a6dd1d706a00a50e6`。应用归档已确认版本 lite.3、thickFrame 关闭及自动命名关闭。实机截图位于 `.artifacts/windows/lite3-settings-common.png` 和 `lite3-settings-advanced.png`。
+
+WSL 新运行目录 `/home/syat/.local/share/paseo-lite/0.8.0-lite.3` 已安装，CLI 启动与自动命名关闭代码已核验；正式 6767 服务仍运行 lite.2，尚未切换/重启，待用户确认。配置、角色、Relay 配对数据未变动。自动命名关闭仅在新版 daemon 中生效，公司本地使用新客户端内置 daemon 即生效，家里 WSL 须待切换。
+
 ## 会话体验优化（2026-09-16，lite.2）
 
 - **完成后折叠整轮过程**：定制客户端在回答结束后收起本轮中间说明、思考、工具调用与任务清单，保留用户消息、最终回答的全部 Markdown 块和通知。点击“展开本轮过程”可以恢复查看。进行中的当前轮保持展开；只修改展示，不删除历史或改变协议。虚拟列表的行修订会跟随折叠状态更新。
@@ -68,7 +121,7 @@
 
 验证：4 个定向测试文件共 363 个测试通过；服务端依赖链构建、所有工作区类型检查、变更文件 lint 与 Electron 平台 UI 导出通过。隔离原生 Codex 会话改名成功，关闭 app-server 后重新启动读取仍得到新名字。浅色设置页浏览器冒烟无页面异常，截图为 `.artifacts/windows/claude-light-settings.png`。
 
-Windows 交付版本为 `0.8.0-lite.2`，路径 `.artifacts/windows/release/`。 已验证本机 Windows 安装，安装器退出码为 0，注册表版本核验为 `0.8.0-lite.2`；用户随后决定卸载家里 Windows 客户端，公司使用同版本 ZIP，完整解压后运行 `Paseo.exe`。ZIP 免安装，但配置与会话仍存储在用户目录，不是随 ZIP 搬迁的数据便携模式。用户选择暂不重启 WSL，当前 daemon 与 `paseo-lite` 入口继续使用 lite.1。WSL 新版安装至 `~/.local/share/paseo-lite/0.8.0-lite.2`；运行中的 daemon 仍需切换到新版才能使原版手机或旧客户端的改名操作同步到 Codex。原版手机 UI 不因服务端更新而改变折叠或主题行为。
+Windows 交付版本为 `0.8.0-lite.2`，路径 `.artifacts/windows/release/`。 已验证本机 Windows 安装，安装器退出码为 0，注册表版本核验为 `0.8.0-lite.2`；用户随后决定卸载家里 Windows 客户端，公司使用同版本 ZIP，完整解压后运行 `Paseo.exe`。ZIP 免安装，但配置与会话仍存储在用户目录，不是随 ZIP 搬迁的数据便携模式。用户随后授权切换，WSL daemon 与 `paseo-lite` / `paseo` 入口已运行 `~/.local/share/paseo-lite/0.8.0-lite.2`。继续沿用完整版的 `~/.paseo`，15 个 Provider 配置、7 个角色预设、31 条历史会话及项目、Relay 身份保持不变；迁移前备份及文件摘要保存在 `~/.local/share/paseo-migrations/20260916-143444/`。AW 活动入口及历史任务已归档，两套罗盘改用 Paseo 同会话交叉复核，接线规则由 PQSelector 的 `docs/PASEO_WORKFLOW.md` 维护。原版手机 UI 不因服务端更新而改变折叠或主题行为。
 
 ## 第四批实施与交付（2026-09-16）
 

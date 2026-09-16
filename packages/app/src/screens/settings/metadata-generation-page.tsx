@@ -110,7 +110,7 @@ export function MetadataGenerationPage({ serverId }: { serverId: string }) {
   return (
     <SettingsSection
       title={t("settings.metadataGeneration.title")}
-      info={t("settings.metadataGeneration.description")}
+      info={t("settings.metadataGeneration.liteDescription")}
       trailing={docsLink}
       testID="metadata-generation-settings"
     >

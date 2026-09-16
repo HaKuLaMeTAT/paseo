@@ -228,6 +228,8 @@ export const es: TranslationResources = {
     },
   },
   agentStream: {
+    expandProcess: en.agentStream.expandProcess,
+    collapseProcess: en.agentStream.collapseProcess,
     empty: "Comience a chatear con este agente...",
     scrollToBottom: "Desplazarse hacia abajo",
     historyLoadFailed: "No se pudo cargar el historial del agente",
@@ -640,6 +642,7 @@ export const es: TranslationResources = {
         closeRight: "Cerrar pestañas a la derecha",
         closeOthers: "Cerrar otras pestañas",
         moveToMain: "Mover al panel principal",
+        archiveAgent: en.workspace.tabs.menu.archiveAgent,
         reloadAgent: "Recargar agente",
         reloadAgentTooltip:
           "Vuelva a cargar el agente para actualizar habilidades, MCP o estado de inicio de sesión.",
@@ -1975,9 +1978,12 @@ export const es: TranslationResources = {
     },
   },
   settings: {
+    pluginsDisabled: en.settings.pluginsDisabled,
     title: "Ajustes",
     loading: "Cargando configuración...",
     groups: {
+      common: en.settings.groups.common,
+      advanced: en.settings.groups.advanced,
       app: "Aplicación",
       host: "Host",
     },
@@ -2041,6 +2047,7 @@ export const es: TranslationResources = {
     },
     plugins: pluginSettings.es,
     metadataGeneration: {
+      liteDescription: en.settings.metadataGeneration.liteDescription,
       title: "Generación de metadatos",
       description:
         "Elige el modelo que Paseo usa para títulos de espacios de trabajo, nombres de ramas, mensajes de commit y borradores de pull requests",

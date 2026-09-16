@@ -96,6 +96,7 @@ describe("window-manager", () => {
         }),
       ).toEqual({
         frame: false,
+        thickFrame: false,
         autoHideMenuBar: true,
       });
     });

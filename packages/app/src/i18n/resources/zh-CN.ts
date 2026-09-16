@@ -636,6 +636,7 @@ export const zhCN: TranslationResources = {
         closeRight: "关闭右侧标签",
         closeOthers: "关闭其他标签",
         moveToMain: "移至主面板",
+        archiveAgent: "归档会话",
         reloadAgent: "重新加载 Agent",
         reloadAgentTooltip: "重新加载 Agent 以更新 skills、MCPs 或登录状态。",
         close: "关闭",
@@ -1908,9 +1909,12 @@ export const zhCN: TranslationResources = {
     },
   },
   settings: {
+    pluginsDisabled: "此 Lite 客户端已关闭插件功能。",
     title: "设置",
     loading: "正在加载设置...",
     groups: {
+      advanced: "高级设置",
+      common: "常用设置",
       app: "应用",
       host: "主机",
     },
@@ -1974,6 +1978,8 @@ export const zhCN: TranslationResources = {
     },
     plugins: pluginSettings["zh-CN"],
     metadataGeneration: {
+      liteDescription:
+        "Lite 已关闭自动工作区命名，新名称取自首条消息，不额外调用模型。这里的模型偏好用于你明确发起的元数据生成操作。",
       title: "元数据生成",
       description: "选择 Paseo 用于工作区标题、分支名称、提交消息和拉取请求草稿的模型",
       selection: "模型选择",
@@ -2002,9 +2008,9 @@ export const zhCN: TranslationResources = {
       defaultSend: {
         label: "默认发送",
         descriptions: {
-          interrupt: "Agent 运行时，Enter 会中断。Command/Ctrl+Enter 会排队。",
-          steer: "Agent 运行时，Enter 会引导当前回合。Command/Ctrl+Enter 会排队。",
-          queue: "Agent 运行时，Enter 会排队。Command/Ctrl+Enter 会提交。",
+          interrupt: "Agent 运行时，Enter 会中断。Command/Ctrl+Enter 会排队。Alt+Enter 换行。",
+          steer: "Agent 运行时，Enter 会引导当前回合。Command/Ctrl+Enter 会排队。Alt+Enter 换行。",
+          queue: "Agent 运行时，Enter 会排队。Command/Ctrl+Enter 会提交。Alt+Enter 换行。",
         },
         options: {
           interrupt: "中断",

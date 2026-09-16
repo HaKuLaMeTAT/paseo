@@ -366,3 +366,42 @@ describe("buildWorkspaceTabMenuEntries", () => {
     expect(terminalSeparator?.key).toBe("rename-separator");
   });
 });
+
+it("archives only agent sessions without invoking close-tab", () => {
+  const archive = vi.fn();
+  const close = vi.fn();
+  const input = {
+    surface: "desktop" as const,
+    tab: createAgentTab(),
+    index: 0,
+    tabCount: 1,
+    menuTestIDBase: "test",
+    onCopyResumeCommand: vi.fn(),
+    onCopyAgentId: vi.fn(),
+    onCopyTerminalId: vi.fn(),
+    onCopyFilePath: vi.fn(),
+    onReloadAgent: vi.fn(),
+    onArchiveAgent: archive,
+    onRenameTab: vi.fn(),
+    onCloseTab: close,
+    onCloseTabsBefore: vi.fn(),
+    onCloseTabsAfter: vi.fn(),
+    onCloseOtherTabs: vi.fn(),
+  };
+  const entry = buildWorkspaceTabMenuEntries(input).find((item) => item.key === "archive-agent");
+  expect(entry?.kind).toBe("item");
+  if (entry?.kind === "item") entry.onSelect();
+  expect(archive).toHaveBeenCalledExactlyOnceWith("agent-123");
+  expect(close).not.toHaveBeenCalled();
+  const terminal: WorkspaceTabDescriptor = {
+    key: "term",
+    tabId: "term",
+    kind: "terminal",
+    target: { kind: "terminal", terminalId: "term" },
+  };
+  expect(
+    buildWorkspaceTabMenuEntries({ ...input, tab: terminal }).some(
+      (item) => item.key === "archive-agent",
+    ),
+  ).toBe(false);
+});

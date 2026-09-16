@@ -11,7 +11,13 @@ async function createAttachmentStore(): Promise<AttachmentStore> {
         await import("../desktop/attachments/desktop-attachment-store");
       const { createDesktopAttachmentBridge } =
         await import("../desktop/attachments/desktop-attachment-bridge");
-      return createDesktopAttachmentStore(createDesktopAttachmentBridge());
+      const { createIndexedDbAttachmentStore } = await import("./web/indexeddb-attachment-store");
+      const { createDesktopInlineAttachmentStore } =
+        await import("../desktop/attachments/desktop-inline-attachment-store");
+      return createDesktopInlineAttachmentStore(
+        createDesktopAttachmentStore(createDesktopAttachmentBridge()),
+        createIndexedDbAttachmentStore(),
+      );
     }
 
     const { createIndexedDbAttachmentStore } = await import("./web/indexeddb-attachment-store");

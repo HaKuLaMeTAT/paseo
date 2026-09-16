@@ -414,6 +414,7 @@ interface MobileWorkspaceTabSwitcherProps {
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
   onCopyFilePath: (path: string) => Promise<void> | void;
+  onArchiveAgent?: (agentId: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
@@ -521,6 +522,7 @@ function MobileWorkspaceTabOption({
   onCopyAgentId,
   onCopyTerminalId,
   onCopyFilePath,
+  onArchiveAgent,
   onReloadAgent,
   onRenameTab,
   onCloseTab,
@@ -540,6 +542,7 @@ function MobileWorkspaceTabOption({
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
   onCopyFilePath: (path: string) => Promise<void> | void;
+  onArchiveAgent?: (agentId: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
@@ -577,6 +580,7 @@ function MobileWorkspaceTabOption({
     onCopyAgentId,
     onCopyTerminalId,
     onCopyFilePath,
+    onArchiveAgent,
     onReloadAgent,
     onRenameTab,
     onCloseTab,
@@ -649,6 +653,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
   onCopyAgentId,
   onCopyTerminalId,
   onCopyFilePath,
+  onArchiveAgent,
   onReloadAgent,
   onRenameTab,
   onCloseTab,
@@ -706,6 +711,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
           onCopyAgentId={onCopyAgentId}
           onCopyTerminalId={onCopyTerminalId}
           onCopyFilePath={onCopyFilePath}
+          onArchiveAgent={onArchiveAgent}
           onReloadAgent={onReloadAgent}
           onRenameTab={onRenameTab}
           onCloseTab={onCloseTab}
@@ -725,6 +731,7 @@ const MobileWorkspaceTabSwitcher = memo(function MobileWorkspaceTabSwitcher({
       onCopyAgentId,
       onCopyTerminalId,
       onCopyFilePath,
+      onArchiveAgent,
       onReloadAgent,
       onRenameTab,
       onCloseTab,
@@ -2739,6 +2746,33 @@ function WorkspaceScreenContent({
     [normalizedServerId, toast, t],
   );
 
+  const handleArchiveAgent = useCallback(
+    async (agentId: string) => {
+      const agent = useSessionStore.getState().sessions[normalizedServerId]?.agents?.get(agentId);
+      if (agent?.status === "running") {
+        const confirmed = await confirmDialog({
+          title: t("workspace.tabs.confirmations.archiveRunningAgentTitle"),
+          message: t("workspace.tabs.confirmations.archiveRunningAgentMessage"),
+          confirmLabel: t("workspace.tabs.confirmations.archive"),
+          cancelLabel: t("workspace.tabs.confirmations.cancel"),
+          destructive: true,
+        });
+        if (!confirmed) return;
+      }
+      try {
+        await archiveAgent({ serverId: normalizedServerId, agentId });
+        for (const tab of allTabDescriptorsById.values()) {
+          if (tab.target.kind === "agent" && tab.target.agentId === agentId) {
+            closeWorkspaceTabWithCleanup({ tabId: tab.tabId, target: tab.target });
+          }
+        }
+      } catch {
+        /* The archive mutation reports failure and retains the session. */
+      }
+    },
+    [archiveAgent, normalizedServerId, t, allTabDescriptorsById, closeWorkspaceTabWithCleanup],
+  );
+
   const handleReloadAgent = useCallback(
     async (agentId: string) => {
       if (!client || !isConnected) {
@@ -3968,6 +4002,7 @@ function WorkspaceScreenContent({
         onCopyAgentId={handleCopyAgentId}
         onCopyTerminalId={handleCopyTerminalId}
         onCopyFilePath={handleCopyFilePath}
+        onArchiveAgent={handleArchiveAgent}
         onReloadAgent={handleReloadAgent}
         onRenameTab={handleRenameTab}
         onCloseTabsToLeft={handleCloseTabsToLeftInPane}
@@ -4004,6 +4039,7 @@ function WorkspaceScreenContent({
     handleCopyAgentId,
     handleCopyTerminalId,
     handleCopyFilePath,
+    handleArchiveAgent,
     handleReloadAgent,
     handleRenameTab,
     handleCloseTabsToLeftInPane,
@@ -4047,6 +4083,7 @@ function WorkspaceScreenContent({
           onCopyAgentId={handleCopyAgentId}
           onCopyTerminalId={handleCopyTerminalId}
           onCopyFilePath={handleCopyFilePath}
+          onArchiveAgent={handleArchiveAgent}
           onReloadAgent={handleReloadAgent}
           onRenameTab={handleRenameTab}
           onCloseTab={handleCloseTabById}
@@ -4071,6 +4108,7 @@ function WorkspaceScreenContent({
             onCopyAgentId={handleCopyAgentId}
             onCopyTerminalId={handleCopyTerminalId}
             onCopyFilePath={handleCopyFilePath}
+            onArchiveAgent={handleArchiveAgent}
             onReloadAgent={handleReloadAgent}
             onRenameTab={handleRenameTab}
             onCloseTabsToLeft={handleCloseTabsToLeft}

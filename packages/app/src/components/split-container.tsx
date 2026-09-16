@@ -110,6 +110,7 @@ interface SplitContainerProps {
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
   onCopyFilePath: (path: string) => Promise<void> | void;
+  onArchiveAgent?: (agentId: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTabsToLeft: (tabId: string, paneTabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
@@ -323,6 +324,7 @@ export function SplitContainer({
   onCopyAgentId,
   onCopyTerminalId,
   onCopyFilePath,
+  onArchiveAgent,
   onReloadAgent,
   onRenameTab,
   onCloseTabsToLeft,
@@ -676,6 +678,7 @@ export function SplitContainer({
                   onCopyAgentId={onCopyAgentId}
                   onCopyTerminalId={onCopyTerminalId}
                   onCopyFilePath={onCopyFilePath}
+                  onArchiveAgent={onArchiveAgent}
                   onReloadAgent={onReloadAgent}
                   onRenameTab={onRenameTab}
                   onCloseTabsToLeft={onCloseTabsToLeft}
@@ -938,6 +941,7 @@ function SplitNodeView({
   onCopyAgentId,
   onCopyTerminalId,
   onCopyFilePath,
+  onArchiveAgent,
   onReloadAgent,
   onRenameTab,
   onCloseTabsToLeft,
@@ -1026,6 +1030,7 @@ function SplitNodeView({
             onCopyAgentId={onCopyAgentId}
             onCopyTerminalId={onCopyTerminalId}
             onCopyFilePath={onCopyFilePath}
+            onArchiveAgent={onArchiveAgent}
             onReloadAgent={onReloadAgent}
             onRenameTab={onRenameTab}
             onCloseTabsToLeft={onCloseTabsToLeft}
@@ -1078,6 +1083,7 @@ function SplitNodeView({
               onCopyAgentId={onCopyAgentId}
               onCopyTerminalId={onCopyTerminalId}
               onCopyFilePath={onCopyFilePath}
+              onArchiveAgent={onArchiveAgent}
               onReloadAgent={onReloadAgent}
               onRenameTab={onRenameTab}
               onCloseTabsToLeft={onCloseTabsToLeft}
@@ -1138,6 +1144,7 @@ function SplitPaneView({
   onCopyAgentId,
   onCopyTerminalId,
   onCopyFilePath,
+  onArchiveAgent,
   onReloadAgent,
   onRenameTab,
   onCloseTabsToLeft,
@@ -1273,6 +1280,7 @@ function SplitPaneView({
             onCopyAgentId={onCopyAgentId}
             onCopyTerminalId={onCopyTerminalId}
             onCopyFilePath={onCopyFilePath}
+            onArchiveAgent={onArchiveAgent}
             onReloadAgent={onReloadAgent}
             onRenameTab={onRenameTab}
             onCloseTabsToLeft={handleCloseTabsToLeft}

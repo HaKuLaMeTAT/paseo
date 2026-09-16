@@ -12,6 +12,7 @@ import React, {
 import { Pressable, Text, View, type LayoutChangeEvent } from "react-native";
 import {
   CopyX,
+  Archive,
   ArrowLeftToLine,
   ArrowRightToLine,
   Copy,
@@ -114,6 +115,7 @@ const AGENT_TOOLTIP_TITLE_MAX_LENGTH = 80;
 
 const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedX = withUnistyles(X);
+const ThemedArchive = withUnistyles(Archive);
 const ThemedCopy = withUnistyles(Copy);
 
 const ThemedRotateCw = withUnistyles(RotateCw);
@@ -403,6 +405,8 @@ function TabContextMenuItem({
     switch (entry.icon) {
       case "copy":
         return <ThemedCopy size={16} uniProps={mutedColorMapping} />;
+      case "archive":
+        return <ThemedArchive size={16} uniProps={mutedColorMapping} />;
       case "rotate-cw":
         return <ThemedRotateCw size={16} uniProps={mutedColorMapping} />;
       case "arrow-left-to-line":
@@ -510,6 +514,7 @@ interface WorkspaceDesktopTabsRowProps {
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
   onCopyFilePath: (path: string) => Promise<void> | void;
+  onArchiveAgent?: (agentId: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTabsToLeft: (tabId: string) => Promise<void> | void;
@@ -1006,6 +1011,7 @@ function ResolvedWorkspaceDesktopTabsRow({
   onCopyAgentId,
   onCopyTerminalId,
   onCopyFilePath,
+  onArchiveAgent,
   onReloadAgent,
   onRenameTab,
   onCloseTabsToLeft,
@@ -1262,6 +1268,7 @@ function ResolvedWorkspaceDesktopTabsRow({
           onCopyAgentId={onCopyAgentId}
           onCopyTerminalId={onCopyTerminalId}
           onCopyFilePath={onCopyFilePath}
+          onArchiveAgent={onArchiveAgent}
           onReloadAgent={onReloadAgent}
           onRenameTab={onRenameTab}
           onCloseTabsToLeft={onCloseTabsToLeft}
@@ -1295,6 +1302,7 @@ function ResolvedWorkspaceDesktopTabsRow({
       onCopyFilePath,
       onCopyResumeCommand,
       onNavigateTab,
+      onArchiveAgent,
       onReloadAgent,
       onRenameTab,
       setHoveredCloseTabKey,
@@ -1409,6 +1417,7 @@ function ResolvedDesktopTabChip({
   onCopyAgentId,
   onCopyTerminalId,
   onCopyFilePath,
+  onArchiveAgent,
   onReloadAgent,
   onRenameTab,
   onCloseTabsToLeft,
@@ -1435,6 +1444,7 @@ function ResolvedDesktopTabChip({
   onCopyAgentId: (agentId: string) => Promise<void> | void;
   onCopyTerminalId: (terminalId: string) => Promise<void> | void;
   onCopyFilePath: (path: string) => Promise<void> | void;
+  onArchiveAgent?: (agentId: string) => Promise<void> | void;
   onReloadAgent: (agentId: string) => Promise<void> | void;
   onRenameTab: (tab: WorkspaceTabDescriptor) => void;
   onCloseTabsToLeft: (tabId: string) => Promise<void> | void;
@@ -1463,6 +1473,7 @@ function ResolvedDesktopTabChip({
         onCopyAgentId,
         onCopyTerminalId,
         onCopyFilePath,
+        onArchiveAgent,
         onReloadAgent,
         onRenameTab,
         onCloseTab,
@@ -1483,6 +1494,7 @@ function ResolvedDesktopTabChip({
       onCopyFilePath,
       onCopyResumeCommand,
       labels,
+      onArchiveAgent,
       onReloadAgent,
       onRenameTab,
       tabCount,

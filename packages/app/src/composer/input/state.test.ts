@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   applyDictationTranscript,
+  resolveComposerLineBreak,
   computeCanStartDictation,
   resolveActiveSendBehavior,
   resolveComposerSurfacePresentation,
@@ -314,5 +315,40 @@ describe("stopRealtimeVoice", () => {
     });
 
     expect(calls).toEqual(["cancel agent", "stop voice"]);
+  });
+});
+
+describe("Alt+Enter composer line break", () => {
+  it("inserts at the caret and replaces selected text without submitting", () => {
+    expect(
+      resolveComposerLineBreak(
+        { key: "Enter", altKey: true },
+        {
+          text: "hello world",
+          selection: { start: 5, end: 6 },
+        },
+      ),
+    ).toEqual({ text: "hello\nworld", selection: { start: 6, end: 6 } });
+    expect(
+      resolveComposerLineBreak(
+        { key: "Enter", altKey: true },
+        {
+          text: "ab",
+          selection: { start: 1, end: 1 },
+        },
+      ),
+    ).toEqual({ text: "a\nb", selection: { start: 2, end: 2 } });
+  });
+  it("leaves Enter, queue shortcuts and other keys to their existing handlers", () => {
+    for (const event of [
+      { key: "Enter" },
+      { key: "Enter", altKey: true, ctrlKey: true },
+      { key: "Enter", altKey: true, metaKey: true },
+      { key: "a", altKey: true },
+    ]) {
+      expect(
+        resolveComposerLineBreak(event, { text: "a", selection: { start: 1, end: 1 } }),
+      ).toBeNull();
+    }
   });
 });

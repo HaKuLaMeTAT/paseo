@@ -228,6 +228,8 @@ export const ja: TranslationResources = {
     },
   },
   agentStream: {
+    expandProcess: en.agentStream.expandProcess,
+    collapseProcess: en.agentStream.collapseProcess,
     empty: "このエージェントとチャットを始めましょう...",
     scrollToBottom: "下にスクロール",
     historyLoadFailed: "エージェントの履歴を読み込めませんでした",
@@ -640,6 +642,7 @@ export const ja: TranslationResources = {
         closeRight: "右のタブを閉じる",
         closeOthers: "他のタブを閉じる",
         moveToMain: "メインパネルへ移動",
+        archiveAgent: en.workspace.tabs.menu.archiveAgent,
         reloadAgent: "エージェントを再読み込み",
         reloadAgentTooltip:
           "スキル、MCP、ログイン状態を更新するためにエージェントを再読み込みします。",
@@ -1947,9 +1950,12 @@ export const ja: TranslationResources = {
     },
   },
   settings: {
+    pluginsDisabled: en.settings.pluginsDisabled,
     title: "設定",
     loading: "設定を読み込み中...",
     groups: {
+      common: en.settings.groups.common,
+      advanced: en.settings.groups.advanced,
       app: "アプリ",
       host: "ホスト",
     },
@@ -2013,6 +2019,7 @@ export const ja: TranslationResources = {
     },
     plugins: pluginSettings.ja,
     metadataGeneration: {
+      liteDescription: en.settings.metadataGeneration.liteDescription,
       title: "メタデータ生成",
       description:
         "ワークスペースのタイトル、ブランチ名、コミットメッセージ、プルリクエストの下書きに使用するモデルを選択します",

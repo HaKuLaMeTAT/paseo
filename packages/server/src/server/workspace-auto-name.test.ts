@@ -64,3 +64,46 @@ test("auto-name preserves workspace archival that lands during its metadata writ
     archivedAt,
   });
 });
+
+test("disabled automatic naming uses the prompt without invoking a model", async () => {
+  let workspace = createPersistedWorkspaceRecord({
+    workspaceId: "lite",
+    projectId: "project",
+    cwd: "/workspace",
+    kind: "directory",
+    displayName: "workspace",
+    createdAt: "2026-09-16T00:00:00.000Z",
+    updatedAt: "2026-09-16T00:00:00.000Z",
+  });
+  const finished = deferred();
+  let calls = 0;
+  const autoName = new WorkspaceAutoName({
+    automaticNaming: false,
+    agentManager: {} as AgentManager,
+    workspaceRegistry: {
+      update: async (_id, updater) => {
+        workspace = updater(workspace);
+        return workspace;
+      },
+    },
+    workspaceGitService: {} as WorkspaceGitService,
+    providerSnapshotManager: {} as ProviderSnapshotManager,
+    readDaemonConfig: () => ({}),
+    gitMutation: { notifyGitMutation: async () => {} },
+    emitWorkspaceUpdateForCwd: async () => {},
+    emitWorkspaceUpdateForWorkspaceId: async () => finished.resolve(),
+    logger: pino({ level: "silent" }),
+    generateWorkspaceName: async () => {
+      calls++;
+      return { title: "model", branch: null };
+    },
+  });
+  autoName.scheduleForDirectory({
+    workspaceId: workspace.workspaceId,
+    cwd: workspace.cwd,
+    firstAgentContext: { prompt: "  Fix the settings\nDetails" },
+  });
+  await finished.promise;
+  expect(calls).toBe(0);
+  expect(workspace.title).toBe("Fix the settings");
+});

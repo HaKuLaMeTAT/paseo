@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDesktopAttachmentStore } from "./desktop-attachment-store";
 import { createFakeDesktopAttachmentBridge } from "./test-utils/fake-desktop-attachment-bridge";
 
@@ -110,5 +110,88 @@ describe("desktop attachment store", () => {
     expect(fake.releasedPreviewUrls).toEqual(["blob:test"]);
     expect(fake.deletedPaths).toEqual(["/managed/att_3.jpg"]);
     expect(fake.garbageCollections).toEqual([{ referencedIds: ["att_3"] }]);
+  });
+});
+
+import { createDesktopInlineAttachmentStore } from "./desktop-inline-attachment-store";
+import type { AttachmentStore, AttachmentMetadata } from "@/attachments/types";
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("desktop clipboard attachment storage", () => {
+  it("keeps pasted bytes out of the file bridge and routes previews, reloads and GC by metadata", async () => {
+    const fake = createFakeDesktopAttachmentBridge();
+    const files = createDesktopAttachmentStore(fake.bridge);
+    const metadata: AttachmentMetadata = {
+      id: "clip",
+      storageType: "web-indexeddb",
+      storageKey: "clip",
+      mimeType: "image/png",
+      createdAt: 1,
+    };
+    const inline: AttachmentStore = {
+      storageType: "web-indexeddb",
+      save: vi.fn(async () => metadata),
+      encodeBase64: vi.fn(async () => "AAECAw=="),
+      resolvePreviewUrl: vi.fn(async () => "blob:clipboard"),
+      releasePreviewUrl: vi.fn(async () => {}),
+      delete: vi.fn(async () => {}),
+      garbageCollect: vi.fn(async () => {}),
+    };
+    const close = vi.fn();
+    vi.stubGlobal(
+      "createImageBitmap",
+      vi.fn(async () => ({ close })),
+    );
+    const store = createDesktopInlineAttachmentStore(files, inline);
+    const source = {
+      kind: "blob" as const,
+      blob: new Blob([new Uint8Array([0, 1, 2, 3])], { type: "image/png" }),
+    };
+    const saved = await store.save({ source });
+    expect(inline.save).toHaveBeenCalledWith({ source });
+    expect(fake.savedEntries).toEqual([]);
+    const reloaded = createDesktopInlineAttachmentStore(files, inline);
+    await expect(reloaded.encodeBase64({ attachment: saved })).resolves.toBe("AAECAw==");
+    expect(close).toHaveBeenCalledOnce();
+    await expect(reloaded.resolvePreviewUrl({ attachment: saved })).resolves.toBe("blob:clipboard");
+    await reloaded.releasePreviewUrl?.({ attachment: saved, url: "blob:clipboard" });
+    expect(inline.releasePreviewUrl).toHaveBeenCalledOnce();
+    await reloaded.delete({ attachment: saved });
+    expect(inline.delete).toHaveBeenCalledOnce();
+    await reloaded.garbageCollect({ referencedIds: new Set([saved.id]) });
+    expect(inline.garbageCollect).toHaveBeenCalledOnce();
+    expect(fake.garbageCollections).toEqual([{ referencedIds: ["clip"] }]);
+    const old = await reloaded.save({
+      source: { kind: "file_uri", uri: "file:///old.png" },
+      mimeType: "image/png",
+    });
+    expect(old.storageType).toBe("desktop-file");
+    await reloaded.encodeBase64({ attachment: old });
+    expect(fake.readBase64Calls).toEqual([old.storageKey]);
+  });
+
+  it("rejects image bytes that the image decoder cannot read", async () => {
+    const fake = createFakeDesktopAttachmentBridge();
+    fake.bridge.readFileBase64 = async () => btoa("%TSD-Header-###%");
+    const files = createDesktopAttachmentStore(fake.bridge);
+    const store = createDesktopInlineAttachmentStore(files, files);
+    vi.stubGlobal(
+      "createImageBitmap",
+      vi.fn(async () => {
+        throw new Error("Invalid image");
+      }),
+    );
+    await expect(
+      store.encodeBase64({
+        attachment: {
+          id: "bad",
+          storageType: "desktop-file",
+          storageKey: "/bad.png",
+          mimeType: "image/png",
+          createdAt: 1,
+        },
+      }),
+    ).rejects.toThrow("重新截图粘贴");
   });
 });

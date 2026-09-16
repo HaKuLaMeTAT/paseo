@@ -230,6 +230,8 @@ export const fr: TranslationResources = {
     },
   },
   agentStream: {
+    expandProcess: en.agentStream.expandProcess,
+    collapseProcess: en.agentStream.collapseProcess,
     empty: "Commencez à discuter avec cet agent...",
     scrollToBottom: "Faire défiler vers le bas",
     historyLoadFailed: "Impossible de charger l’historique de l’agent",
@@ -640,6 +642,7 @@ export const fr: TranslationResources = {
         closeRight: "Près de la droite",
         closeOthers: "Fermer les autres onglets",
         moveToMain: "Déplacer vers le panneau principal",
+        archiveAgent: en.workspace.tabs.menu.archiveAgent,
         reloadAgent: "Agent de rechargement",
         reloadAgentTooltip:
           "Rechargez l'agent pour mettre à jour les compétences, les MCP ou le statut de connexion.",
@@ -1980,9 +1983,12 @@ export const fr: TranslationResources = {
     },
   },
   settings: {
+    pluginsDisabled: en.settings.pluginsDisabled,
     title: "Paramètres",
     loading: "Chargement des paramètres...",
     groups: {
+      common: en.settings.groups.common,
+      advanced: en.settings.groups.advanced,
       app: "Application",
       host: "Host",
     },
@@ -2046,6 +2052,7 @@ export const fr: TranslationResources = {
     },
     plugins: pluginSettings.fr,
     metadataGeneration: {
+      liteDescription: en.settings.metadataGeneration.liteDescription,
       title: "Génération de métadonnées",
       description:
         "Choisissez le modèle utilisé par Paseo pour les titres d’espaces de travail, les noms de branches, les messages de commit et les brouillons de pull request",

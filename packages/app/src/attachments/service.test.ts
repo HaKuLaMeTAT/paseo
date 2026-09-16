@@ -89,6 +89,17 @@ describe("attachment service", () => {
     ]);
   });
 
+  it("rejects the send instead of silently dropping an unreadable attachment", async () => {
+    const store = createRecordingStore();
+    store.encodeBase64 = async () => {
+      throw new Error("Unreadable image");
+    };
+    __setAttachmentStoreForTests(store);
+    await expect(encodeAttachmentsForSend([createAttachment()])).rejects.toThrow(
+      "Unreadable image",
+    );
+  });
+
   it("keeps provider send output byte-compatible", async () => {
     const store = createRecordingStore();
     __setAttachmentStoreForTests(store);
