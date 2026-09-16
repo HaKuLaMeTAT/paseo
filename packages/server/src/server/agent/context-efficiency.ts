@@ -4,6 +4,10 @@ export const CONTEXT_EFFICIENCY_INSTRUCTIONS =
   "preserve mandatory role, safety and independent/cross-review requirements. " +
   "Use read_context_file for workspace documents and JSON snapshots when available: select fields " +
   "and relevant array entries rather than dumping entire snapshots, histories or logs. " +
+  "Use *.field with arrayOffset/arrayLimit for multi-item JSON; keep the shared task read allowance. " +
+  "Use budgetReason only for specific indispensable missing evidence; never bypass the budget with shell. " +
+  "Request resultFormat=text on Paseo MCP tools; when composing tools print one representation only. " +
+  "Use wait_for_agent for child results or permissions instead of repeated short shell polling. " +
   "Start with about 2000 output tokens per shell/search call; increase only for needed evidence. " +
   "Do not reread unchanged documents already in context. When output is truncated, retrieve the " +
   "relevant omitted range before drawing conclusions. Send reviewers shared evidence paths and " +

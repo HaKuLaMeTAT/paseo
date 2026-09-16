@@ -1431,15 +1431,34 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     {
       title: "Read focused context",
       description:
-        "Read a bounded workspace document range or selected JSON snapshot fields. Unchanged selections are omitted on repeated reads. Use force after context compaction; follow nextOffset/nextLine for omitted evidence. JSON fields use dot paths and numeric array indexes.",
+        "Read bounded workspace files or Markdown in configured home skill directories and ancestor AGENTS.md/CLAUDE.md. Unchanged selections are omitted. JSON requires dot-path fields; * projects array entries with arrayOffset/arrayLimit. Follow nextOffset/nextLine/nextArrayOffset for omitted evidence; force rereads after compaction.",
       inputSchema: {
         path: z.string().min(1),
         fields: z.array(z.string().min(1)).min(1).max(30).optional(),
         startLine: z.number().int().min(1).optional(),
         maxLines: z.number().int().min(1).max(200).optional(),
         offset: z.number().int().min(0).optional(),
-        maxChars: z.number().int().min(1).max(16000).optional(),
+        maxChars: z
+          .number()
+          .int()
+          .min(1)
+          .max(16000)
+          .optional()
+          .describe(
+            "Output is capped at 8000 characters; default 4000, shared task allowance 48000.",
+          ),
         force: z.boolean().optional(),
+        arrayOffset: z.number().int().min(0).optional(),
+        arrayLimit: z.number().int().min(1).max(50).optional(),
+        budgetReason: z
+          .string()
+          .trim()
+          .min(20)
+          .max(300)
+          .optional()
+          .describe(
+            "Specific missing evidence justifying a bounded read beyond the shared task budget; never use shell to bypass it.",
+          ),
       },
     },
     async (input) => {
@@ -1975,6 +1994,39 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
         throw new Error("unreachable");
     }
   }
+
+  registerTool(
+    "wait_for_agent",
+    {
+      title: "Wait for agent event",
+      description:
+        "Wait up to 30 seconds for a child's completion or permission request without restarting the parent turn. If still running, do other work or end your turn to receive the deferred notification; do not poll through short shell waits.",
+      inputSchema: { agentId: z.string() },
+    },
+    async ({ agentId }, context) => {
+      if (!agentManager.getAgent(agentId)) {
+        throw new Error(
+          `Agent ${agentId} is not loaded; use get_agent_status for stored sessions.`,
+        );
+      }
+      const result = await waitForAgentWithTimeout(agentManager, agentId, {
+        signal: context.signal,
+      });
+      const message = result.permission ? null : result.lastMessage;
+      const truncated = Boolean(message && message.length > 4000);
+      return {
+        content: [],
+        structuredContent: ensureValidJson({
+          ...result,
+          lastMessage: truncated
+            ? `${message!.slice(0, 4000)}\n[truncated; use get_agent_activity for omitted evidence]`
+            : message,
+          truncated,
+          permission: sanitizePermissionRequest(result.permission),
+        }),
+      };
+    },
+  );
 
   registerTool(
     "send_agent_prompt",

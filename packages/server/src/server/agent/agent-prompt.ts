@@ -1,3 +1,4 @@
+import { deferAgentNotification } from "./deferred-notifications.js";
 import type { Logger } from "pino";
 
 import type {
@@ -229,6 +230,7 @@ export interface SendPromptToAgentParams {
   prompt: AgentPromptInput;
   messageId?: string;
   activeTurnBehavior?: ActiveTurnBehavior;
+  replaceRunning?: boolean;
   runOptions?: AgentRunOptions;
   /** Optional mode to set on the agent before the run starts. */
   sessionMode?: string;
@@ -331,7 +333,7 @@ export async function sendPromptToAgent(
     : params.runOptions;
 
   return await startAgentRun(params.agentManager, params.agentId, params.prompt, params.logger, {
-    replaceRunning: true,
+    replaceRunning: params.replaceRunning ?? true,
     activeTurnBehavior: params.activeTurnBehavior,
     clearPendingPermissions: params.clearPendingPermissions,
     runOptions,
@@ -409,7 +411,8 @@ function formatFinishNotificationBody(params: FinishNotificationBodyInput): stri
       )}\n</permission-request>`,
     );
   }
-  let lastAssistantMessage = params.lastAssistantMessage?.trim();
+  let lastAssistantMessage =
+    params.reason === "needs permission" ? undefined : params.lastAssistantMessage?.trim();
   if (lastAssistantMessage) {
     if (lastAssistantMessage.length > FINISH_NOTIFICATION_MESSAGE_LIMIT) {
       const omitted = lastAssistantMessage.length - FINISH_NOTIFICATION_MESSAGE_LIMIT;
@@ -469,14 +472,38 @@ export function setupFinishNotification(params: SetupFinishNotificationParams): 
       permissionRequest,
     });
 
-    await sendPromptToAgent({
-      agentManager,
-      agentStorage,
-      agentId: callerAgentId,
-      prompt: formatSystemNotificationPrompt(body),
-      activeTurnBehavior: "steer",
-      unarchive: false,
-      logger,
+    deferAgentNotification({
+      manager: agentManager,
+      parentId: callerAgentId,
+      key: `${childAgentId}:${permissionRequest?.id ?? "terminal"}`,
+      build: async () => {
+        const caller = await agentStorage.get(callerAgentId);
+        if (caller?.archivedAt) return null;
+        const child = await agentStorage.get(childAgentId);
+        if (requireParentOwnership && getParentAgentIdFromLabels(child?.labels) !== callerAgentId)
+          return null;
+        if (
+          permissionRequest &&
+          !agentManager.getAgent(childAgentId)?.pendingPermissions.has(permissionRequest.id)
+        )
+          return null;
+        return body;
+      },
+      deliver: async (notification) =>
+        await sendPromptToAgent({
+          agentManager,
+          agentStorage,
+          agentId: callerAgentId,
+          prompt: formatSystemNotificationPrompt(notification),
+          replaceRunning: false,
+          unarchive: false,
+          logger,
+        }),
+      onError: (err) =>
+        logger.error(
+          { err, childAgentId, callerAgentId },
+          "Failed to deliver deferred agent notification",
+        ),
     });
   }
 

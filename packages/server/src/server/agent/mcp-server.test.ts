@@ -867,6 +867,16 @@ describe("browser MCP tools", () => {
       expectSingleTextContent(browserResult);
       expect(expectSingleTextContent(listAgentsResult)).toContain('"agents": []');
 
+      const compactResult = await client.callTool({
+        name: "list_agents",
+        arguments: { resultFormat: "text" },
+      });
+      expect(compactResult.isError).not.toBe(true);
+      expect(compactResult).not.toHaveProperty("structuredContent");
+      expect(expectSingleTextContent(compactResult)).toBe(
+        expectSingleTextContent(listAgentsResult),
+      );
+
       const listedTools = await client.listTools();
       expect(listedTools.tools.map((tool) => tool.name)).toEqual(
         expect.arrayContaining(["browser_list_tabs", "list_agents"]),
@@ -5367,6 +5377,37 @@ describe("agent snapshot MCP serialization", () => {
     expect(structured.agents[0]).not.toHaveProperty("runtimeInfo");
     expect(structured.agents[0]).not.toHaveProperty("persistence");
     expect(structured.agents[0]).not.toHaveProperty("pendingPermissions");
+  });
+
+  it("waits without starting an agent and bounds the returned report", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    spies.agentManager.getAgent.mockReturnValue(createManagedAgent({ id: "child" }));
+    spies.agentManager.waitForAgentEvent.mockResolvedValue({
+      status: "idle",
+      permission: null,
+      lastMessage: "x".repeat(6000),
+    });
+    const server = await createAgentMcpServer({
+      agentManager,
+      agentStorage,
+      logger,
+      providerSnapshotManager: createClaudeOnlyManager(),
+    });
+    try {
+      const response = await registeredTool(server, "wait_for_agent").handler({ agentId: "child" });
+      expect(response.structuredContent).toMatchObject({ status: "idle", truncated: true });
+      expect(response.structuredContent.lastMessage).toBe(
+        "x".repeat(4000) + "\n[truncated; use get_agent_activity for omitted evidence]",
+      );
+      expect(spies.agentManager.waitForAgentEvent).toHaveBeenCalledWith(
+        "child",
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      expect(spies.agentManager.streamAgent).not.toHaveBeenCalled();
+      expect(spies.agentManager.resumeAgentFromPersistence).not.toHaveBeenCalled();
+    } finally {
+      await server.close();
+    }
   });
 
   it("returns archived agent snapshots from storage for get_agent_status", async () => {

@@ -1,3 +1,4 @@
+import { getContextReader } from "./context-reader.js";
 import { CONTEXT_EFFICIENCY_INSTRUCTIONS } from "./context-efficiency.js";
 import { projectTimelineRows } from "./timeline-projection.js";
 import type { PluginLifecycle } from "../plugins/lifecycle/index.js";
@@ -4608,6 +4609,9 @@ export class AgentManager {
   ): void {
     if (this.timelineStore.getSubmittedUserMessage(agent.id, clientMessageId)) {
       return;
+    }
+    if (!isSystemInjectedEnvelope(submittedPromptText(prompt))) {
+      getContextReader(this, agent.id).beginTask(clientMessageId);
     }
     this.touchUpdatedAt(agent);
     agent.lastUserMessageAt = new Date();

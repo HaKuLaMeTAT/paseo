@@ -98,17 +98,22 @@ function createFinishNotificationScenario(
     }
     return null;
   });
-  Reflect.set(agentManager, "subscribe", (callback: (event: AgentManagerEvent) => void) => {
-    subscriber = callback;
-    return () => {
-      subscriber = null;
-    };
-  });
+  Reflect.set(
+    agentManager,
+    "subscribe",
+    (callback: (event: AgentManagerEvent) => void, filter?: { agentId?: string }) => {
+      if (filter?.agentId === "caller-agent") return () => {};
+      subscriber = callback;
+      return () => {
+        subscriber = null;
+      };
+    },
+  );
   Reflect.set(agentManager, "getLastAssistantMessage", async () => {
     return options?.childLastAssistantMessage ?? null;
   });
   Reflect.set(agentManager, "tryRunOutOfBand", () => false);
-  Reflect.set(agentManager, "hasInFlightRun", () => Boolean(options?.parentPromptError));
+  Reflect.set(agentManager, "hasInFlightRun", () => false);
   Reflect.set(agentManager, "steerOrReplaceActiveTurn", async () => {
     steerAttemptCount += 1;
     return { status: "inactive" };
@@ -117,6 +122,7 @@ function createFinishNotificationScenario(
     parentPrompted = true;
     parentPrompts.push(prompt);
     resolveParentPrompt?.(prompt);
+    if (options?.parentPromptError) throw options.parentPromptError;
     return (async function* noop() {})();
   });
   Reflect.set(agentManager, "replaceAgentRun", async (_agentId: string, prompt: string) => {
@@ -277,7 +283,7 @@ test("finish notifications tell the parent the child's last assistant message", 
       "Agent child-agent (Child Agent) finished.\n\n<agent-response>\nImplemented the cleanup and all checks pass.\n</agent-response>",
     ),
   );
-  expect(scenario.steerAttemptCount()).toBe(1);
+  expect(scenario.steerAttemptCount()).toBe(0);
 });
 
 test("finish notifications truncate oversized child responses", async () => {
@@ -367,27 +373,26 @@ test("an idle permission resolution waits for the resumed run to finish", async 
   expect(scenario.parentPrompts()[2]).toContain("finished.");
 });
 
-test("finish notifications report every concurrently pending permission", async () => {
+test("finish notifications batch concurrently pending permissions into one parent turn", async () => {
   const scenario = createFinishNotificationScenario();
-
   scenario.startWatchingChild();
   scenario.requestChildPermission("permission-1");
   scenario.requestChildPermission("permission-2");
-
-  await vi.waitFor(() => expect(scenario.parentPrompts()).toHaveLength(2));
-  expect(
-    scenario.parentPrompts().map((prompt) => {
-      const payload = prompt.match(/<permission-request>\n([\s\S]+?)\n<\/permission-request>/)?.[1];
-      return JSON.parse(payload!).requestId;
-    }),
-  ).toEqual(["permission-1", "permission-2"]);
-
+  await vi.waitFor(() => expect(scenario.parentPrompts()).toHaveLength(1));
+  const requests = [
+    ...scenario
+      .parentPrompts()[0]
+      .matchAll(/<permission-request>\n([\s\S]+?)\n<\/permission-request>/g),
+  ];
+  expect(requests.map((entry) => JSON.parse(entry[1]).requestId)).toEqual([
+    "permission-1",
+    "permission-2",
+  ]);
   scenario.resolveChildPermission("permission-1");
   scenario.resolveChildPermission("permission-2");
   scenario.finishChild();
-
-  await vi.waitFor(() => expect(scenario.parentPrompts()).toHaveLength(3));
-  expect(scenario.parentPrompts()[2]).toContain("finished.");
+  await vi.waitFor(() => expect(scenario.parentPrompts()).toHaveLength(2));
+  expect(scenario.parentPrompts()[1]).toContain("finished.");
 });
 
 test("finish notifications survive repeated permission cycles", async () => {
@@ -442,10 +447,9 @@ test("finish notifications log a rejected parent prompt without an unhandled rej
 
   expect(captured.records).toEqual([
     expect.objectContaining({
-      msg: "Failed to notify caller agent",
+      msg: "Failed to deliver deferred agent notification",
       childAgentId: "child-agent",
       callerAgentId: "caller-agent",
-      reason: "finished",
       err: expect.objectContaining({ message: "parent provider rejected replacement" }),
     }),
   ]);
