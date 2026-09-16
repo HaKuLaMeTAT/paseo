@@ -126,6 +126,7 @@ interface CodexClientLike {
 type CodexTestSession = AgentSession & {
   connectionState: "disconnected" | "history-ready" | "connected";
   currentThreadId: string | null;
+  threadConfigurationApplied: boolean;
   activeForegroundTurnId: string | null;
   client: CodexClientLike | null;
 };
@@ -167,6 +168,7 @@ function createSession(
   ) as CodexTestSession;
   session.connectionState = "connected";
   session.currentThreadId = "test-thread";
+  session.threadConfigurationApplied = true;
   session.activeForegroundTurnId = "test-turn";
   return session;
 }
@@ -691,6 +693,27 @@ process.stdin.on("data", (chunk) => {
 }
 
 describe("Codex app-server provider", () => {
+  test("applies runtime configuration once even when the resumed thread is already loaded", async () => {
+    const session = createSession({ systemPrompt: "KEEP_ROLE" });
+    session.threadConfigurationApplied = false;
+    const request = vi.fn(async (method: string) => {
+      if (method === "thread/loaded/list") return { data: ["test-thread"] };
+      if (method === "thread/resume") return { thread: { id: "test-thread" } };
+      throw new Error(method);
+    });
+    session.client = { request };
+    await asInternals(session).ensureThreadLoaded();
+    await asInternals(session).ensureThreadLoaded();
+    expect(request.mock.calls.filter(([method]) => method === "thread/resume")).toHaveLength(1);
+    expect(request).toHaveBeenCalledWith(
+      "thread/resume",
+      expect.objectContaining({
+        config: { tool_output_token_limit: 4000 },
+        developerInstructions: expect.stringContaining("KEEP_ROLE"),
+      }),
+    );
+  });
+
   test("Lite bounds retained tool output while preserving role instructions and one user input", async () => {
     const requests: Array<{ method: string; params: unknown }> = [];
     const session = createSession({
@@ -709,7 +732,7 @@ describe("Codex app-server provider", () => {
       }),
     };
     await session.startTurn("only this new message");
-    for (const method of ["thread/start", "turn/start"]) {
+    for (const method of ["thread/start"]) {
       const params = requests.find((r) => r.method === method)?.params as Record<string, unknown>;
       expect(params.config).toMatchObject({ tool_output_token_limit: 4000 });
       expect(params.developerInstructions).toContain("ROLE_RULE");
@@ -718,6 +741,8 @@ describe("Codex app-server provider", () => {
     }
     const turns = requests.filter((r) => r.method === "turn/start");
     expect(turns).toHaveLength(1);
+    expect(turns[0].params).not.toHaveProperty("config");
+    expect(turns[0].params).not.toHaveProperty("developerInstructions");
     expect(turns[0].params).toMatchObject({
       input: [{ type: "text", text: "only this new message" }],
     });
@@ -884,8 +909,10 @@ describe("Codex app-server provider", () => {
     const request = vi.fn(async (method: string) => {
       if (method === "thread/loaded/list") return { data: ["test-thread"] };
       if (method === "turn/start") return {};
+      if (method === "thread/resume") return { thread: { id: "test-thread" } };
       throw new Error(`Unexpected request: ${method}`);
     });
+    session.threadConfigurationApplied = false;
     session.activeForegroundTurnId = null;
     session.client = createStub<CodexClientLike>({ request });
 
@@ -900,6 +927,9 @@ describe("Codex app-server provider", () => {
         excludeSlashTmp: true,
         excludeTmpdirEnvVar: true,
       },
+    });
+    const resumed = request.mock.calls.find(([method]) => method === "thread/resume")?.[1];
+    expect(resumed).toMatchObject({
       config: {
         sandbox_mode: "workspace-write",
         sandbox_workspace_write: {
@@ -962,8 +992,10 @@ describe("Codex app-server provider", () => {
     const request = vi.fn(async (method: string) => {
       if (method === "thread/loaded/list") return { data: ["test-thread"] };
       if (method === "turn/start") return {};
+      if (method === "thread/resume") return { thread: { id: "test-thread" } };
       throw new Error(`Unexpected request: ${method}`);
     });
+    session.threadConfigurationApplied = false;
     session.activeForegroundTurnId = null;
     session.client = createStub<CodexClientLike>({ request });
 
@@ -972,6 +1004,9 @@ describe("Codex app-server provider", () => {
     const turnStart = request.mock.calls.find(([method]) => method === "turn/start")?.[1];
     expect(turnStart).toMatchObject({
       sandboxPolicy: { type: "readOnly" },
+    });
+    const resumed = request.mock.calls.find(([method]) => method === "thread/resume")?.[1];
+    expect(resumed).toMatchObject({
       config: {
         sandbox_mode: "read-only",
         mcp_servers: {
@@ -983,7 +1018,7 @@ describe("Codex app-server provider", () => {
         },
       },
     });
-    expect(turnStart).not.toHaveProperty("config.mcp_servers.hub.tools.reply");
+    expect(resumed).not.toHaveProperty("config.mcp_servers.hub.tools.reply");
   });
 
   test("passes ephemeral: true to thread/start when constructed as ephemeral", async () => {

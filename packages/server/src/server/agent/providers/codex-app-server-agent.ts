@@ -1,3 +1,4 @@
+import { CONTEXT_EFFICIENCY_INSTRUCTIONS } from "../context-efficiency.js";
 import {
   getAgentStreamEventTurnId,
   type AgentPermissionAction,
@@ -139,14 +140,6 @@ function isCodexAlreadyUnarchivedError(error: unknown, threadId: string): boolea
 const TURN_START_TIMEOUT_MS = 90 * 1000;
 const INTERRUPT_TIMEOUT_MS = 2_000;
 const CODEX_PROVIDER = "codex" as const;
-// Bound retained tool output in Lite sessions; role instructions remain authoritative.
-const CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS =
-  "Keep tool results concise: search first, read relevant ranges, and summarize large JSON/logs " +
-  "instead of dumping whole files. Start with about 2000 output tokens per shell/search call; " +
-  "increase only for needed evidence. Do not reread unchanged documents already in context. " +
-  "When output is truncated, retrieve the relevant omitted range before drawing conclusions. " +
-  "Preserve required role instructions, independent reviews and cross-review stages.";
-
 // Codex treats most app-server client names as the model-request originator.
 // This reserved Codex name is non-originating, so requests keep Codex's default
 // CLI identity instead of showing up as Paseo in provider usage logs.
@@ -3311,6 +3304,7 @@ export class CodexAppServerAgentSession implements AgentSession {
   > | null = null;
   private resolvedSandboxPolicy: Record<string, unknown> | null = null;
   private currentThreadId: string | null = null;
+  private threadConfigurationApplied = false;
   private currentTurnId: string | null = null;
   private pendingForegroundTurnIdentification: {
     foregroundTurnId: string;
@@ -3483,6 +3477,7 @@ export class CodexAppServerAgentSession implements AgentSession {
       throw this.createClosedError();
     }
     this.client = client;
+    this.threadConfigurationApplied = false;
     client.setUnexpectedTerminationHandler((error) => {
       this.handleUnexpectedTermination(error);
     });
@@ -3684,7 +3679,9 @@ export class CodexAppServerAgentSession implements AgentSession {
       match.developer_instructions,
       this.config.systemPrompt,
       this.config.daemonAppendSystemPrompt,
-      CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS,
+      this.config.daemonAppendSystemPrompt?.includes(CONTEXT_EFFICIENCY_INSTRUCTIONS)
+        ? undefined
+        : CONTEXT_EFFICIENCY_INSTRUCTIONS,
     );
     if (developerInstructions) settings.developer_instructions = developerInstructions;
     if (this.config.model) settings.model = this.config.model;
@@ -3902,7 +3899,9 @@ export class CodexAppServerAgentSession implements AgentSession {
     const developerInstructions = composeSystemPromptParts(
       this.config.systemPrompt,
       this.config.daemonAppendSystemPrompt,
-      CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS,
+      this.config.daemonAppendSystemPrompt?.includes(CONTEXT_EFFICIENCY_INSTRUCTIONS)
+        ? undefined
+        : CONTEXT_EFFICIENCY_INSTRUCTIONS,
     );
     if (developerInstructions) {
       params.developerInstructions = developerInstructions;
@@ -3914,10 +3913,11 @@ export class CodexAppServerAgentSession implements AgentSession {
     try {
       const loaded = toObjectRecord(await this.client.request("thread/loaded/list", {}));
       const ids = Array.isArray(loaded?.data) ? loaded.data : [];
-      if (ids.includes(this.currentThreadId)) {
+      if (ids.includes(this.currentThreadId) && this.threadConfigurationApplied) {
         return;
       }
       const response = await this.client.request("thread/resume", params);
+      this.threadConfigurationApplied = true;
       this.rememberResolvedSandboxPolicy(response);
     } catch (error) {
       const threadId = this.currentThreadId;
@@ -3931,6 +3931,7 @@ export class CodexAppServerAgentSession implements AgentSession {
           }
         }
         const response = await this.client.request("thread/resume", params);
+        this.threadConfigurationApplied = true;
         this.rememberResolvedSandboxPolicy(response);
         this.logger.info({ threadId }, "Unarchived Codex thread to restore active Paseo agent");
         return;
@@ -4056,18 +4057,6 @@ export class CodexAppServerAgentSession implements AgentSession {
     if (options?.outputSchema) {
       params.outputSchema = normalizeCodexOutputSchema(options.outputSchema);
     }
-    const developerInstructions = composeSystemPromptParts(
-      this.config.systemPrompt,
-      this.config.daemonAppendSystemPrompt,
-      CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS,
-    );
-    if (developerInstructions) {
-      params.developerInstructions = developerInstructions;
-    }
-    const codexConfig = this.buildCodexInnerConfig();
-    if (codexConfig) {
-      params.config = codexConfig;
-    }
 
     return {
       params,
@@ -4075,8 +4064,8 @@ export class CodexAppServerAgentSession implements AgentSession {
       approvalPolicy,
       sandboxPolicyType,
       hasOutputSchema: Boolean(options?.outputSchema),
-      hasDeveloperInstructions: Boolean(developerInstructions),
-      hasCodexConfig: Boolean(codexConfig),
+      hasDeveloperInstructions: false,
+      hasCodexConfig: false,
     };
   }
 
@@ -5110,6 +5099,7 @@ export class CodexAppServerAgentSession implements AgentSession {
 
     const { params, approvalPolicy, sandbox } = this.buildThreadStartRequest(model);
     const rawResponse = await this.client.request("thread/start", params);
+    this.threadConfigurationApplied = true;
     this.rememberResolvedSandboxPolicy(rawResponse);
     const response = toObjectRecord(rawResponse);
     const threadRecord = toObjectRecord(response?.thread);
@@ -5144,7 +5134,9 @@ export class CodexAppServerAgentSession implements AgentSession {
     const developerInstructions = composeSystemPromptParts(
       this.config.systemPrompt,
       this.config.daemonAppendSystemPrompt,
-      CODEX_CONTEXT_EFFICIENCY_INSTRUCTIONS,
+      this.config.daemonAppendSystemPrompt?.includes(CONTEXT_EFFICIENCY_INSTRUCTIONS)
+        ? undefined
+        : CONTEXT_EFFICIENCY_INSTRUCTIONS,
     );
     const params: Record<string, unknown> = {
       model,

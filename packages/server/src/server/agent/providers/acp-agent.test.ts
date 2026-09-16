@@ -2761,6 +2761,34 @@ describe("ACPAgentSession", () => {
     ]);
   });
 
+  test("sends runtime instructions once without changing the submitted user text", async () => {
+    const session = createSession();
+    const internals = asInternals<
+      ACPSessionInternals & { config: { systemPrompt?: string; daemonAppendSystemPrompt?: string } }
+    >(session);
+    internals.config.systemPrompt = "ROLE_RULE";
+    internals.config.daemonAppendSystemPrompt = "Read focused snapshot fields";
+    internals.sessionId = "session-1";
+    const prompt = vi.fn(async () => ({ stopReason: "end_turn" as const }));
+    internals.connection = { prompt };
+    await session.startTurn("first");
+    await vi.waitFor(() => expect(internals.activeForegroundTurnId).toBeNull());
+    await session.startTurn("follow-up");
+    expect(prompt).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        prompt: [
+          { type: "text", text: expect.stringContaining("ROLE_RULE") },
+          { type: "text", text: "first" },
+        ],
+      }),
+    );
+    expect(prompt).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ prompt: [{ type: "text", text: "follow-up" }] }),
+    );
+  });
+
   test("startTurn returns before the ACP prompt settles and completes later via subscribers", async () => {
     const session = createSession();
     const events: Array<{ type: string; turnId?: string }> = [];

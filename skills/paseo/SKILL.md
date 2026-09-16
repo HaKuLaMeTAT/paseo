@@ -51,11 +51,15 @@ paseo script stop <name> [--cwd <path> | --workspace <workspace-id>]
 
 ## Agents
 
-**`create_agent`** — required: `title`, `provider` (`claude/opus`, `codex/gpt-5.4`, …), `initialPrompt`. Optional: `workspaceId`, `notifyOnFinish`, `settings`, `labels`. Returns `{ agentId, workspaceId, … }`.
+**`read_context_file`** — agent-scoped workspace reads: `{ path, fields?, startLine?, maxLines?, offset?, maxChars?, force? }`. Start with document headings or a relevant range; JSON snapshots require explicit `fields` using dot paths (e.g. `positions.0.symbol`, `timestamp`). Output defaults to 8000 characters; follow `nextOffset`/`nextLine` for omitted evidence. Repeated unchanged selections return a short notice. Use `force` only when content is no longer in context (for example after compaction). Mandatory role and review rules still apply; do not fetch every linked document or dump whole snapshots by default.
+
+**`create_agent`** — required: `title`, `provider` (`claude/opus`, `codex/gpt-5.4`, …), `initialPrompt`. Optional: `workspaceId`, `notifyOnFinish`, `settings`, `labels`, `taskId`, `role`. Returns `{ agentId, workspaceId, … }`.
 
 Initial runtime settings live under `settings`: `modeId`, `thinkingOptionId`, and provider-specific `features`. Agent profiles are the preferred source for these values. For Codex fast mode, pass `settings: { features: { "fast_mode": true } }` when creating the agent.
 
-Agent-scoped creation always creates your subagent. Omit `workspaceId` to use your current workspace; pass a workspace returned by `create_workspace` for isolated delegation. Placement never changes parentage.
+Agent-scoped creation creates or returns your subagent. Use a stable `taskId` (business run/evidence snapshot) and `role` for repeated delegation. The same parent, workspace, task and role returns the existing unarchived agent with `reused: true`; the initial prompt is NOT sent again. Send follow-ups and cross-review using `send_agent_prompt` and that ID. Do not create replacement agents while waiting. A new blind independent assessment needs a new taskId because the prior reviewer has already seen the coordinator’s conclusion. Without taskId, only identical initial prompts are deduplicated; do not rely on title matching. Model/settings conflicts require explicit update or a distinct task.
+
+Agent-scoped creation always keeps the caller as parent. Omit `workspaceId` to use your current workspace; pass a workspace returned by `create_workspace` for isolated delegation. Placement never changes parentage.
 
 Detach is an explicit user action in the subagents track, not an agent tool. A cross-workspace child remains your subagent even though it also appears as a normal tab in its workspace.
 

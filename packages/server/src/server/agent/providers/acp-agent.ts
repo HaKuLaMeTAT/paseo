@@ -1662,6 +1662,7 @@ export class ACPAgentSession implements AgentSession, ACPClient {
   private readonly initialHandle?: AgentPersistenceHandle;
 
   private readonly config: AgentSessionConfig;
+  private sentRuntimeInstructions = false;
   private child: ChildProcessWithoutNullStreams | null = null;
   private connection: ClientSideConnection | null = null;
   private agentCapabilities: ACPAgentCapabilities | null = null;
@@ -1855,17 +1856,29 @@ export class ACPAgentSession implements AgentSession, ACPClient {
     this.pushEvent({ type: "turn_started", provider: this.provider, turnId });
     this.emitSubmittedUserMessage(prompt, messageId, turnId, options?.clientMessageId);
 
+    const runtimeInstructions = [this.config.systemPrompt, this.config.daemonAppendSystemPrompt]
+      .filter(Boolean)
+      .join("\n\n");
+    const content = toACPContentBlocks(prompt);
+    if (!this.sentRuntimeInstructions && runtimeInstructions) {
+      content.unshift({
+        type: "text",
+        text: `<paseo-runtime-instructions>\n${runtimeInstructions}\n</paseo-runtime-instructions>`,
+      });
+      this.sentRuntimeInstructions = true;
+    }
     void this.connection
       .prompt({
         sessionId: this.sessionId,
         messageId,
-        prompt: toACPContentBlocks(prompt),
+        prompt: content,
       })
       .then((response) => {
         this.handlePromptResponse(response, turnId);
         return;
       })
       .catch((error) => {
+        this.sentRuntimeInstructions = false;
         const summary = summarizeACPRequestError(error);
         this.finishTurn({
           type: "turn_failed",

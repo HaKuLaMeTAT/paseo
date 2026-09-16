@@ -1216,6 +1216,83 @@ describe("create_agent MCP tool", () => {
   });
   const ensureWorkspaceForCreate = async () => "workspace-created";
 
+  it("deduplicates concurrent role delegation across MCP connections and returns the original child", async () => {
+    const { agentManager, agentStorage, spies } = createTestDeps();
+    const parent = {
+      id: "parent",
+      provider: "codex",
+      cwd: existingCwd,
+      workspaceId: "wks_parent",
+      config: { provider: "codex", model: "gpt-5.4" },
+      labels: {},
+    } as ManagedAgent;
+    let child: ManagedAgent | undefined;
+    spies.agentManager.getAgent.mockImplementation((id: string) =>
+      id === "parent" ? parent : child,
+    );
+    spies.agentStorage.list.mockImplementation(async () => (child ? [child] : []));
+    spies.agentManager.createAgent.mockImplementation(
+      async (
+        config: AgentSessionConfig,
+        _handle: unknown,
+        options: { labels: Record<string, string> },
+      ) => {
+        await Promise.resolve();
+        child = {
+          id: "child",
+          provider: "codex",
+          cwd: existingCwd,
+          workspaceId: "wks_parent",
+          lifecycle: "idle",
+          currentModeId: null,
+          availableModes: [],
+          config,
+          labels: options.labels,
+        } as ManagedAgent;
+        return child;
+      },
+    );
+    const options = {
+      agentManager,
+      agentStorage,
+      callerAgentId: "parent",
+      logger,
+      providerSnapshotManager: createOpenCodeManager().manager,
+      listActiveWorkspaces: async () => [
+        { workspaceId: "wks_parent", cwd: existingCwd, kind: "local" as const },
+      ],
+    };
+    const serverA = await createAgentMcpServer(options);
+    const serverB = await createAgentMcpServer(options);
+    const input = {
+      title: "Review",
+      provider: "codex/gpt-5.4",
+      initialPrompt: "Independent review",
+      taskId: "snapshot-1",
+      role: "reviewer",
+    };
+    const results = await Promise.all([
+      registeredTool(serverA, "create_agent").handler(input),
+      registeredTool(serverB, "create_agent").handler(input),
+    ]);
+    expect(results.map((r) => r.structuredContent.agentId)).toEqual(["child", "child"]);
+    expect(results.map((r) => r.structuredContent.reused).sort()).toEqual([false, true]);
+    expect(spies.agentManager.createAgent).toHaveBeenCalledTimes(1);
+    expect(spies.agentManager.streamAgent).toHaveBeenCalledTimes(1);
+    const replay = await registeredTool(serverB, "create_agent").handler({
+      ...input,
+      title: "Renamed",
+      initialPrompt: "Follow-up",
+    });
+    expect(replay.structuredContent.reused).toBe(true);
+    expect(spies.agentManager.streamAgent).toHaveBeenCalledTimes(1);
+    await expect(
+      registeredTool(serverB, "create_agent").handler({ ...input, provider: "claude/sonnet" }),
+    ).rejects.toThrow("different model/settings");
+    await serverA.close();
+    await serverB.close();
+  });
+
   it("requires a concise title no longer than 60 characters", async () => {
     const { agentManager, agentStorage } = createTestDeps();
     const server = await createAgentMcpServer({
@@ -3102,10 +3179,10 @@ describe("create_agent MCP tool", () => {
       }),
       undefined,
       {
-        labels: {
+        labels: expect.objectContaining({
           [PARENT_AGENT_ID_LABEL]: "voice-agent",
           source: "voice",
-        },
+        }),
         workspaceId: "wks_voice",
       },
     );
@@ -3307,9 +3384,9 @@ describe("create_agent MCP tool", () => {
       }),
       undefined,
       {
-        labels: {
+        labels: expect.objectContaining({
           [PARENT_AGENT_ID_LABEL]: "parent-agent",
-        },
+        }),
         workspaceId: "wks_parent",
       },
     );

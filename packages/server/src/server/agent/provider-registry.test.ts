@@ -4,6 +4,7 @@ import type { ToolPolicy } from "@getpaseo/protocol/agent-types";
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import type {
   AgentClient,
+  AgentPersistenceHandle,
   AgentFeature,
   AgentModelDefinition,
   AgentMode,
@@ -58,6 +59,7 @@ const mockState = vi.hoisted(() => {
       }>,
     },
     isCommandAvailable: vi.fn(async (_command: string) => false),
+    renameNativeSession: vi.fn(async (_provider: string, _handle: unknown, _title: string) => {}),
     runtimeModels: new Map<string, AgentModelDefinition[]>(),
     cursorListFeaturesConfigs: [] as AgentSessionConfig[],
     reset() {
@@ -71,6 +73,7 @@ const mockState = vi.hoisted(() => {
       this.constructorArgs.genericAcp = [];
       this.isCommandAvailable.mockReset();
       this.isCommandAvailable.mockImplementation(async (_command: string) => false);
+      this.renameNativeSession.mockReset();
       this.runtimeModels.clear();
       this.cursorListFeaturesConfigs = [];
     },
@@ -162,6 +165,10 @@ vi.mock("./providers/codex-app-server-agent.js", () => ({
 
     async resumeSession(): Promise<never> {
       throw new Error("not implemented");
+    }
+
+    async renameNativeSession(handle: AgentPersistenceHandle, title: string): Promise<void> {
+      await mockState.renameNativeSession(this.provider, handle, title);
     }
 
     async fetchCatalog(): Promise<ProviderCatalog> {
@@ -1845,4 +1852,29 @@ describe("fetchCatalog", () => {
     expect(catalog.models.map((model) => model.id)).toEqual(["catalog-model"]);
     expect(catalog.modes.map((mode) => mode.id)).toEqual(["ask"]);
   });
+});
+
+test("custom Codex providers forward native rename and propagate failures", async () => {
+  const registry = buildProviderRegistry(logger, {
+    providerOverrides: {
+      "pq-analyst-xiaoba": { extends: "codex", label: "小巴" },
+    },
+  });
+  const client = registry["pq-analyst-xiaoba"]!.createClient(logger);
+  const handle: AgentPersistenceHandle = {
+    provider: "pq-analyst-xiaoba",
+    sessionId: "native-thread",
+    nativeHandle: "native-thread",
+  };
+  expect(client.renameNativeSession).toBeTypeOf("function");
+  await client.renameNativeSession!(handle, "20260916");
+  expect(mockState.renameNativeSession).toHaveBeenCalledWith(
+    "codex",
+    { ...handle, provider: "codex" },
+    "20260916",
+  );
+  expect(handle.provider).toBe("pq-analyst-xiaoba");
+  mockState.renameNativeSession.mockRejectedValueOnce(new Error("rename failed"));
+  await expect(client.renameNativeSession!(handle, "another")).rejects.toThrow("rename failed");
+  expect(registry.claude!.createClient(logger).renameNativeSession).toBeUndefined();
 });

@@ -60,11 +60,15 @@
 
 当前未决：最明显的卡顿场景、已有插件/调度的使用情况，以及两台主机实测的资源基线。
 
-## 当前部署状态（2026-09-16，Lite.5）
+## 当前部署状态（2026-09-16，Lite.5 服务端补丁）
 
-用户确认公司加密终端已可传图片，并授权重启 WSL、提交推送。本机 `paseo` / `paseo-lite` 入口、supervisor 和 worker 已切换到 `/home/syat/.local/share/paseo-lite/0.8.0-lite.5`，正式服务监听 `127.0.0.1:6767`。沿用现有 `~/.paseo`，配置与 Relay 身份不变；回滚备份位于 `/home/syat/.local/share/paseo-migrations/20260916-160235-lite5`。重启前有 1 个运行中会话，已按授权停服切换。
+本机 `paseo` / `paseo-lite` 入口、supervisor 和 worker 已切换到 `/home/syat/.local/share/paseo-lite/0.8.0-lite.5-context.1`，监听 `127.0.0.1:6767`。按用户此前重启授权，在两条会话均空闲时切换；配置与 Relay 身份 SHA256 校验不变，Relay control/data 均已重连。回滚备份：`/home/syat/.local/share/paseo-migrations/20260916-163623-context-reuse`。仅连接 WSL 的客户端可继续使用 Lite.5；公司 Windows 本地 Agent 需要更新包内 daemon，本次目标交付为 `Paseo-Lite-0.8.0-lite.6-x64.zip`。
 
-以下各批中“未切换/待重启”的说明记录的是当时交付状态；现在统一以本节为准。Lite.3 的自动命名关闭、Lite.4 的 Codex 上下文预算及 Lite.5 的 Codex 图片直传代码均已由新版服务加载。旧会话已有上下文不会自动清空，旧损坏图片附件仍须重新粘贴。
+本补丁已加载：自定义 Codex Provider 改名转发修复、所有 Provider 共用上下文约束、ACP 首轮传递、Codex 配置恢复路径修正、按需读取/快照字段筛选/重复内容省略工具，以及 MCP 按父会话＋工作区＋任务＋角色复用与并发去重。实现边界和验证证据见[上下文排查记录](codex-context-audit.md)。本地两份 Paseo 技能说明与服务端内置技能已同步。
+
+定向测试覆盖 AgentManager、Codex、ACP、MCP 工具、上下文读取和委派锁；服务端类型检查、变更文件 lint 与构建通过。原生改名转发此前 51 项测试通过，本次一并加载。未重复调用模型执行持仓分析，实际上下文节省比例仍待下一轮工作流验证。
+
+以下各批中“未切换/待重启”记录的是当时状态；现在以本节为准。旧上下文不会自动清空，旧损坏图片仍须重新粘贴；普通 CLI run 仍表示新建，模型委派的任务复用通过 MCP create_agent/send_agent_prompt 生效。
 
 ## 加密终端粘贴图片修复（lite.5，2026-09-16）
 

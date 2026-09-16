@@ -2,7 +2,7 @@ extends: ./electron-builder.yml
 appId: sh.paseo.desktop.lite
 productName: Paseo Lite
 extraMetadata:
-  version: 0.8.0-lite.5
+  version: 0.8.0-lite.6
 publish: null
 extraResources:
   - from: ../../config/lightweight.json

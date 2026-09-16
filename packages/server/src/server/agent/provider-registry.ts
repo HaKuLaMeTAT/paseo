@@ -487,10 +487,15 @@ function wrapClientProvider(
   const listImportableSessions = inner.listImportableSessions?.bind(inner);
   const importSession = inner.importSession?.bind(inner);
   const listFeatures = inner.listFeatures?.bind(inner);
+  const renameNativeSession = inner.renameNativeSession?.bind(inner);
 
   return {
     provider,
     capabilities: inner.capabilities,
+    renameNativeSession: renameNativeSession
+      ? async (handle, title) =>
+          await renameNativeSession({ ...handle, provider: inner.provider }, title)
+      : undefined,
     createSession: async (config, launchContext) =>
       wrapSessionProvider(
         provider,

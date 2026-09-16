@@ -1,3 +1,4 @@
+import { CONTEXT_EFFICIENCY_INSTRUCTIONS } from "./context-efficiency.js";
 import { projectTimelineRows } from "./timeline-projection.js";
 import type { PluginLifecycle } from "../plugins/lifecycle/index.js";
 import { describeHookAgent, publishAgentStream } from "../plugins/lifecycle/index.js";
@@ -5105,7 +5106,12 @@ export class AgentManager {
   }
 
   private applyDaemonAppendSystemPrompt(config: AgentSessionConfig): AgentSessionConfig {
-    const daemonAppendSystemPrompt = this.appendSystemPrompt.trim();
+    const daemonAppendSystemPrompt = [
+      this.appendSystemPrompt.trim(),
+      CONTEXT_EFFICIENCY_INSTRUCTIONS,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
     const next = { ...config };
     delete next.daemonAppendSystemPrompt;
 

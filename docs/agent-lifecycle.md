@@ -52,7 +52,7 @@ Accepting new work after an ambiguous interruption would create a split-brain se
 
 ## Relationships
 
-Agents can launch other agents via the agent-scoped `create_agent` MCP tool. Agent-scoped creation is always asynchronous and always stamps `paseo.parent-agent-id`, pointing back at the caller. Omit `workspaceId` to use the caller's workspace, or pass an existing workspace ID returned by `create_workspace`. Placement never changes parentage.
+Agents can launch other agents via the agent-scoped `create_agent` MCP tool. For repeat delegation, supply stable `taskId` and `role` values. Lite reuses an unarchived child with the same parent, workspace, task and role; concurrent calls cannot create duplicate children for that key. `reused: true` means the initial prompt was not sent again: use `send_agent_prompt` for follow-ups. Model/settings conflicts fail explicitly. A fresh blind independent review needs a new task ID; the previous reviewer already knows the coordinator’s conclusions. Without taskId, only identical initial prompts are deduplicated. Ordinary CLI `run` remains explicit creation. Agent-scoped creation is always asynchronous and always stamps `paseo.parent-agent-id`, pointing back at the caller. Omit `workspaceId` to use the caller's workspace, or pass an existing workspace ID returned by `create_workspace`. Placement never changes parentage.
 
 - **Subagents** — exist as part of the creating agent's work, appear in that agent's subagent track, and are archived with it.
 - **Detached agents** — stand on their own after an explicit detach transition, do not appear in the former parent's subagent track, and are not archived with it.

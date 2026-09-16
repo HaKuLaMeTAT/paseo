@@ -1,3 +1,10 @@
+import { getContextReader } from "../context-reader.js";
+import {
+  DELEGATION_KEY,
+  DELEGATION_SPEC,
+  delegationIdentity,
+  withDelegationLock,
+} from "../delegation-reuse.js";
 import { z } from "zod";
 import { ensureValidJson } from "../../json-utils.js";
 import type { Logger } from "pino";
@@ -979,6 +986,22 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
       .describe("Create a new workspace for the agent."),
   ]);
   const commonCreateAgentFields = {
+    taskId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(160)
+      .optional()
+      .describe(
+        "Stable task/evidence-run ID. Reuse for follow-ups; use a NEW ID for a new blind independent review.",
+      ),
+    role: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("Stable delegated role within this task, e.g. reviewer. Defaults to provider."),
     title: z
       .string()
       .trim()
@@ -1404,14 +1427,40 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
   );
 
   registerTool(
+    "read_context_file",
+    {
+      title: "Read focused context",
+      description:
+        "Read a bounded workspace document range or selected JSON snapshot fields. Unchanged selections are omitted on repeated reads. Use force after context compaction; follow nextOffset/nextLine for omitted evidence. JSON fields use dot paths and numeric array indexes.",
+      inputSchema: {
+        path: z.string().min(1),
+        fields: z.array(z.string().min(1)).min(1).max(30).optional(),
+        startLine: z.number().int().min(1).optional(),
+        maxLines: z.number().int().min(1).max(200).optional(),
+        offset: z.number().int().min(0).optional(),
+        maxChars: z.number().int().min(1).max(16000).optional(),
+        force: z.boolean().optional(),
+      },
+    },
+    async (input) => {
+      const caller = resolveCallerAgent();
+      if (!callerAgentId || !caller)
+        throw new Error("read_context_file requires an agent-scoped caller");
+      const result = await getContextReader(agentManager, callerAgentId).read(caller.cwd, input);
+      return { content: [], structuredContent: ensureValidJson(result) };
+    },
+  );
+
+  registerTool(
     "create_agent",
     {
       title: "Create agent",
       description:
-        "Create an agent. Agent-scoped creation defaults to your workspace and creates your subagent. Top-level creation without workspaceId creates a new local workspace. Requires provider/model (for example codex/gpt-5.4) and an initial prompt. Do not guess; call list_providers and list_models first if uncertain.",
+        "Create or reuse a subagent by parent + workspace + taskId + role. A reused agent is returned WITHOUT resending initialPrompt; use send_agent_prompt for follow-ups. Use a new taskId for a fresh independent review. Agent-scoped creation defaults to your workspace and creates your subagent. Top-level creation without workspaceId creates a new local workspace. Requires provider/model (for example codex/gpt-5.4) and an initial prompt. Do not guess; call list_providers and list_models first if uncertain.",
       inputSchema: createAgentInputSchema,
       outputSchema: {
         agentId: z.string(),
+        reused: z.boolean().optional(),
         type: AgentProviderEnum,
         status: AgentStatusEnum,
         cwd: z.string(),
@@ -1435,46 +1484,102 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
         requestedBackground = resolvedArgs.parsedArgs.background;
         notifyOnFinish = resolvedArgs.parsedArgs.notifyOnFinish ?? false;
       }
-      const selectedProvider = resolveRequiredProviderModel(parsedArgs.provider).provider;
-      const inheritedConfig = resolveInheritedProviderConfig(selectedProvider);
+      const key =
+        callerAgentId && !resolvedArgs.detached && resolvedArgs.workspaceId
+          ? delegationIdentity({
+              parentId: callerAgentId,
+              workspaceId: resolvedArgs.workspaceId,
+              taskId: parsedArgs.taskId,
+              role: parsedArgs.role,
+              provider: parsedArgs.provider,
+              prompt: parsedArgs.initialPrompt,
+            })
+          : null;
+      const spec = JSON.stringify([parsedArgs.provider, parsedArgs.settings ?? null]);
+      const createOrReuse = async () => {
+        if (key) {
+          const records = await agentStorage.list();
+          const existing = records.find(
+            (record) =>
+              !record.archivedAt &&
+              record.labels?.["paseo.parent-agent-id"] === callerAgentId &&
+              record.workspaceId === resolvedArgs.workspaceId &&
+              record.labels?.[DELEGATION_KEY] === key,
+          );
+          if (existing) {
+            const requested = resolveRequiredProviderModel(parsedArgs.provider);
+            if (
+              existing.labels?.[DELEGATION_SPEC] !== spec ||
+              existing.provider !== requested.provider ||
+              existing.config?.model !== requested.model
+            ) {
+              throw new Error(
+                `Delegation already exists as ${existing.id} with different model/settings. Update that agent explicitly, or use a new taskId for a distinct task.`,
+              );
+            }
+            const snapshot = await ensureAgentLoaded(existing.id, {
+              agentManager,
+              agentStorage,
+              logger: childLogger,
+            });
+            return { snapshot, background: true, initialPromptStarted: false, reused: true };
+          }
+        }
+        const selectedProvider = resolveRequiredProviderModel(parsedArgs.provider).provider;
+        const inheritedConfig = resolveInheritedProviderConfig(selectedProvider);
+        const result = await createAgentCommand(
+          {
+            agentManager,
+            agentStorage,
+            logger: childLogger,
+            paseoHome: options.paseoHome,
+            worktreesRoot: options.worktreesRoot,
+            terminalManager,
+            providerSnapshotManager,
+            createPaseoWorktree: options.createPaseoWorktree,
+            ...(options.ensureWorkspaceForCreate
+              ? { ensureWorkspaceForCreate: options.ensureWorkspaceForCreate }
+              : {}),
+          },
+          {
+            kind: "mcp",
+            provider: parsedArgs.provider,
+            title: parsedArgs.title,
+            initialPrompt: parsedArgs.initialPrompt,
+            config: inheritedConfig,
+            cwd: resolvedArgs.cwd,
+            workspaceId: resolvedArgs.workspaceId,
+            thinking: parsedArgs.settings?.thinkingOptionId,
+            features: parsedArgs.settings?.features,
+            labels: {
+              ...parsedArgs.labels,
+              ...(key
+                ? {
+                    [DELEGATION_KEY]: key,
+                    [DELEGATION_SPEC]: spec,
+                    "paseo.delegation-role": parsedArgs.role ?? selectedProvider,
+                    ...(parsedArgs.taskId ? { "paseo.delegation-task": parsedArgs.taskId } : {}),
+                  }
+                : {}),
+            },
+            mode: parsedArgs.settings?.modeId,
+            background: requestedBackground,
+            notifyOnFinish,
+            detached: resolvedArgs.detached,
+            callerAgentId,
+            callerContext,
+            worktree,
+          },
+        );
+
+        return { ...result, reused: false };
+      };
       const {
         snapshot,
         background: createdInBackground,
         initialPromptStarted,
-      } = await createAgentCommand(
-        {
-          agentManager,
-          agentStorage,
-          logger: childLogger,
-          paseoHome: options.paseoHome,
-          worktreesRoot: options.worktreesRoot,
-          terminalManager,
-          providerSnapshotManager,
-          createPaseoWorktree: options.createPaseoWorktree,
-          ...(options.ensureWorkspaceForCreate
-            ? { ensureWorkspaceForCreate: options.ensureWorkspaceForCreate }
-            : {}),
-        },
-        {
-          kind: "mcp",
-          provider: parsedArgs.provider,
-          title: parsedArgs.title,
-          initialPrompt: parsedArgs.initialPrompt,
-          config: inheritedConfig,
-          cwd: resolvedArgs.cwd,
-          workspaceId: resolvedArgs.workspaceId,
-          thinking: parsedArgs.settings?.thinkingOptionId,
-          features: parsedArgs.settings?.features,
-          labels: parsedArgs.labels,
-          mode: parsedArgs.settings?.modeId,
-          background: requestedBackground,
-          notifyOnFinish,
-          detached: resolvedArgs.detached,
-          callerAgentId,
-          callerContext,
-          worktree,
-        },
-      );
+        reused,
+      } = key ? await withDelegationLock(agentManager, key, createOrReuse) : await createOrReuse();
 
       try {
         if (!createdInBackground && initialPromptStarted) {
@@ -1509,14 +1614,20 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
 
       // Return immediately for async creation.
       const currentSnapshot = agentManager.getAgent(snapshot.id) ?? snapshot;
-      const guidance =
-        callerAgentId && notifyOnFinish && initialPromptStarted
-          ? "You will get notified when the created agent finishes, errors, or needs permission. Do not poll for status; continue with other work until the notification arrives."
-          : undefined;
+      let guidance: string | undefined;
+      if (reused) {
+        guidance =
+          "Existing subagent reused. initialPrompt was NOT sent again. Do not create a replacement or repeat the original task; use send_agent_prompt for a new follow-up when appropriate.";
+      } else if (callerAgentId && notifyOnFinish && initialPromptStarted) {
+        guidance =
+          "You will get notified when the created agent finishes, errors, or needs permission. Do not poll for status; continue with other work until the notification arrives.";
+      }
+
       const response = {
         content: [],
         structuredContent: ensureValidJson({
           agentId: currentSnapshot.id,
+          reused,
           type: snapshot.provider,
           status: currentSnapshot.lifecycle,
           cwd: currentSnapshot.cwd,
