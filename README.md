@@ -1,204 +1,124 @@
 <p align="center">
-  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
+  <img src="packages/desktop/assets/icon-windows.png" width="96" height="96" alt="Paseo Lite 图标">
 </p>
 
-<h1 align="center">Paseo</h1>
+<h1 align="center">Paseo Lite</h1>
 
-<p align="center">
-  <a href="README.md">English</a> ·
-  <a href="README.zh-CN.md">简体中文</a> ·
-  <a href="README.ja.md">日本語</a> ·
-  <a href="README.ko.md">한국어</a>
-</p>
+<p align="center">面向 WSL、Windows 桌面与原版手机 App 的个人定制版</p>
 
-<p align="center">
-  <a href="https://github.com/getpaseo/paseo/stargazers">
-    <img src="https://img.shields.io/github/stars/getpaseo/paseo?style=flat&logo=github" alt="GitHub stars">
-  </a>
-  <a href="https://github.com/getpaseo/paseo/releases">
-    <img src="https://img.shields.io/github/v/release/getpaseo/paseo?style=flat&logo=github" alt="GitHub release">
-  </a>
-  <a href="https://x.com/moboudra">
-    <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
-  </a>
-  <a href="https://discord.gg/jz8T2uahpH">
-    <img src="https://img.shields.io/badge/Discord-555?logo=discord" alt="Discord">
-  </a>
-  <a href="https://www.reddit.com/r/PaseoAI/">
-    <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
-  </a>
-</p>
+基于 [getpaseo/paseo](https://github.com/getpaseo/paseo)，保留本地 AI agent、多主机连接与加密 Relay，关闭不使用的功能并减少空闲后台工作。当前定制桌面版本为 **0.8.0-lite.2**。
 
-<p align="center">One interface for Claude Code, Codex, Copilot, OpenCode, and Pi agents.</p>
+这里的 Lite 指功能裁剪与后台行为调整。桌面仍使用 Electron，尚未完成同负载的原版性能对照，不承诺内存降低比例。
 
-<p align="center">
-  <img src="https://paseo.sh/hero-mockup.png" alt="Paseo app screenshot" width="100%">
-</p>
+## 使用场景
 
-<p align="center">
-  <img src="https://paseo.sh/mobile-mockup.png" alt="Paseo mobile app" width="100%">
-</p>
+| 设备         | 运行方式                                                                        |
+| ------------ | ------------------------------------------------------------------------------- |
+| 家里 WSL     | 运行 daemon 和本地 agent，保存配置、项目及会话；家里 Windows 无需安装桌面客户端 |
+| 公司 Windows | 使用免安装桌面包，运行公司本地 agent，同时通过 Relay 连接家里 WSL               |
+| 手机         | 使用原版 Paseo App，通过 Relay 连接主机；不修改或重新发布手机 App               |
 
-Run agents in parallel on your own machines. Ship from your phone or your desk.
+两台主机各自持有工作区和会话。多主机连接不等于自动复制项目、凭据或执行状态。
 
-- **Self-hosted:** Agents run on your machine with your full dev environment. Use your tools, your configs, and your skills.
-- **Multi-provider:** Claude Code, Codex, Copilot, OpenCode, and Pi through the same interface. Pick the right model for each job.
-- **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.
-- **Cross-device:** iOS, Android, desktop, web, and CLI. Start work at your desk, check in from your phone, script it from the terminal.
-- **Privacy-first:** Paseo doesn't have any telemetry, tracking, or forced log-ins.
+## 我们定制了什么
 
-## Plugins
+### 功能裁剪
 
-Add themes, workspace panels, commands, settings screens, and coding-agent providers with trusted
-TypeScript plugins. Install from a local directory or Git repository with `paseo plugin add <source>`.
+| 功能               | 定制后的行为                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| 语音、听写、播报   | 轻量配置关闭语音能力；定制 Web/Electron 移除入口。全部禁用时不初始化语音服务、不下载模型、不建立恢复计时器     |
+| 内嵌浏览器         | Electron 禁用 webview，移除浏览器桥接及新建入口；已有浏览器标签保留链接，可用系统浏览器打开                    |
+| Provider           | 默认启用 Claude Code、Codex、OpenCode，保留 Cursor 和自定义 ACP；Copilot、Pi、OMP 默认关闭，适配器与协议仍保留 |
+| 插件与公开服务代理 | 轻量配置默认关闭；保留扩展契约及本地工作区服务路由                                                             |
+| 自动归档           | 轻量配置关闭合并后自动归档                                                                                     |
+| 多窗口             | 定制桌面复用一个窗口，保留工作区标签、终端、文件、diff、审批和通知                                             |
+| 上游自动更新       | Lite 不查询或安装上游桌面更新，避免覆盖定制功能；更新需手动替换定制包                                          |
 
-See the [plugin docs](https://paseo.sh/docs/plugins) for your Paseo version, or start with the
-[0.8 beta quickstart](https://paseo.sh/docs/plugins/v0.8). Plugins run with access to your daemon
-machine and inside connected clients; install only code you trust.
+Cursor 模板使用 `cursor-agent acp`，需要主机安装支持 ACP 的对应 CLI；保留适配器不代表本机已安装。所有 Provider 都需要各自的 CLI 与登录配置，Paseo 不附带模型账号。
 
-## Getting Started
+### 后台优化
 
-Paseo runs a local server called the daemon that manages your coding agents. Clients like the desktop app, mobile app, web app, and CLI connect to it.
+- **文件监听按需持有**：侧栏不再持续占用递归工作树监听；文件或 diff 面板需要时获取订阅，关闭后释放，保留仓库身份与元数据检测。
+- **隐藏面板减少请求**：隐藏的 Git/PR 面板不因缓存失效继续查询，重新显示时获取最新状态。
+- **关闭自动远端刷新**：停止启动时及周期性的 `git fetch`，取消后台 PR/CI 定时轮询；手动 Git 操作仍保留。刷新 UI 不等于拉取远端引用。
+- **减少空闲计时器**：无服务路由时不做探活；没有可运行调度任务时不保留调度计时器；健康监听器不再周期性重复初始化。
+- **后台 agent 保持独立**：默认关闭桌面窗口后 daemon 继续运行；已有明确的退出设置仍受尊重，不按客户端连接数量停止 agent。
 
-### Prerequisites
+侧栏状态可能暂时使用缓存。Hub、调度与历史数据没有被直接删除；不把“当前未使用”当作永久移除功能。
 
-You need at least one agent CLI installed and configured with your credentials:
+### 会话与界面优化
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-- [Codex](https://github.com/openai/codex)
-- [GitHub Copilot](https://github.com/features/copilot/cli/)
-- [OpenCode](https://github.com/anomalyco/opencode)
-- [Pi](https://pi.dev)
+- **整轮过程自动折叠**：回答完成后收起中间说明、思考、工具调用与任务清单，保留最终回答和通知；可随时展开，历史数据不删除。
+- **Codex 原生会话改名**：在 Paseo 修改 Codex 会话标题时，同步写入 Codex 原生会话，运行中和已关闭的会话均支持。原生改名失败会报错；目前是 Paseo → Codex 的同步，不是所有 Provider 的双向标题监听。
+- **Claude 浅色主题**：暖白背景、深色正文、陶土橙强调色，代码与终端配色一并调整。
+- **Windows 新图标**：炭黑底、浅色 P 与绿色终端符号，覆盖程序、窗口及安装器图标。
 
-### Desktop app (recommended)
+折叠和主题属于定制客户端改动，原版手机 UI 不随 daemon 更新而改变；Codex 改名同步需要主机运行新版 daemon。
 
-Download it from [paseo.sh/download](https://paseo.sh/download) or the [GitHub releases page](https://github.com/getpaseo/paseo/releases). Open the app and the daemon starts automatically. Nothing else to install.
+## 保留的核心能力
 
-To connect from your phone, open **Settings → your host → Pair Device**.
+Relay 与端到端加密、多主机配对、会话创建/发送/中断/审批、历史与归档、项目和工作区、worktree、终端、文件浏览、diff 以及完成/待审批通知。手机协议保持兼容；端到端的设备验收进度见下文。
 
-### CLI / headless
+## 使用定制版
 
-Install the CLI and start Paseo:
+### Windows 免安装包
 
-```bash
-npm install -g @getpaseo/cli
-paseo
-```
+当前交付文件为 `Paseo-Lite-0.8.0-lite.2-x64.zip`，约 180 MiB。**完整解压后运行 `Paseo.exe`**，不能只拷贝一个 EXE。添加主机时粘贴目标 daemon 生成的完整 Relay 配对链接。
 
-Paseo starts locally, then asks whether to enable the end-to-end encrypted relay for device pairing. If you decline, connect directly over TCP, Tailscale, or another VPN. This path is useful for servers and remote machines.
+ZIP 无需安装，但配置与会话仍写入用户目录，不是数据随 ZIP 一起移动的便携模式。包不包含主机的账号凭据或配对信息。
 
-For full setup and configuration, see:
+当前定制包为本地构建交付，未作为本轮 GitHub Release 或 npm 包发布。上游下载页、上游 Docker 镜像和 `npm install -g @getpaseo/cli` 提供的是上游版本，不能用来获取本仓库的定制改动。
 
-- [Docs](https://paseo.sh/docs)
-- [Connectivity guide](https://paseo.sh/docs/connectivity)
-- [Configuration reference](https://paseo.sh/docs/configuration)
+### WSL / 无桌面主机
 
-### Docker
+使用本仓库构建的 daemon/CLI，沿用主机的 `~/.paseo`。升级前备份配置、身份、项目与会话；停止旧 daemon 后再启动新版，避免两份程序竞争同一数据目录。
 
-Run the Paseo daemon and self-hosted web UI in Docker:
+[config/lightweight.json](config/lightweight.json) 是轻量配置模板：
+
+- 已有主机只合并对应字段，保留 Relay 地址、身份、环境变量、角色预设和自定义 Provider；不要整文件覆盖旧配置。
+- Lite 桌面首次启动会合并模板、备份旧配置并写入一次性标记，后续启动不重复覆盖用户设置。
+- 手动部署 daemon 时需要自行合并模板；配置还可能被已有环境变量覆盖。
+- daemon 启动环境必须能找到所需 agent CLI，尤其检查 WSL 的 Node 工具目录是否在 PATH 中。
+
+在已经配置 `paseo-lite` 入口的主机上：
 
 ```bash
-docker run -d --name paseo \
-  -p 6767:6767 \
-  -e PASEO_PASSWORD=change-me \
-  -v "$PWD/paseo-home:/home/paseo" \
-  -v "$PWD:/workspace" \
-  ghcr.io/getpaseo/paseo:latest
+paseo-lite daemon start
+paseo-lite daemon pair --relay
+paseo-lite ls
 ```
 
-Open `http://localhost:6767` after it starts. Extend the base image with the agent CLIs you use, then provide credentials through environment variables or the persistent `/home/paseo` volume. See the [Docker documentation](docs/docker.md) for full setup details.
+手机扫码，公司客户端粘贴配对链接，即可连接同一台 WSL 主机。
 
-## CLI
+## 从源码构建
 
-Everything you can do in the app, you can do from the terminal.
+已验证的构建环境使用 Node.js 22.22.1。仓库采用 npm workspaces：
 
 ```bash
-paseo run --provider claude/opus-4.6 "implement user authentication"
-paseo run --provider codex/gpt-5.5 --worktree feature-x "implement feature X"
-
-paseo ls                           # list running agents
-paseo attach abc123                # stream live output
-paseo send abc123 "also add tests" # follow-up task
-
-# run on a remote daemon; --cwd is a path on that host
-paseo run --host workstation.local:6767 --cwd /workspace "run the full test suite"
-```
-
-See the [full CLI reference](https://paseo.sh/docs/cli) for more.
-
-## TypeScript SDK
-
-Build issue integrations, dashboards, and orchestration services with `@getpaseo/client`:
-
-```ts
-import { createPaseoClient } from "@getpaseo/client";
-
-const client = createPaseoClient({ url: "ws://127.0.0.1:6767/ws" });
-await client.connect();
-
-const agent = await client.agents.create({
-  config: { provider: "codex/gpt-5.5" },
-  cwd: "/Users/me/dev/storefront",
-  prompt: "Review the current diff and name the riskiest change.",
-});
-
-const result = await agent.waitForFinish();
-console.log(result.lastMessage);
-
-await client.close();
-```
-
-See the [SDK quickstart](https://paseo.sh/docs/sdk/quickstart), [recipes](https://paseo.sh/docs/sdk/recipes), and [API reference](https://paseo.sh/docs/sdk/reference).
-
-## Skills
-
-Skills teach your agent to use Paseo to orchestrate other agents.
-
-```bash
-npx skills add getpaseo/paseo
-```
-
-Then use them in any agent conversation:
-
-- `/paseo-handoff` — hand off work between agents. I use this to plan with Claude and then handoff to Codex to implement.
-- `/paseo-advisor` — spin up a single agent as an advisor for a second opinion, without delegating the work itself.
-- `/paseo-committee` — form a committee of two contrasting agents to step back, do root cause analysis, and produce a plan.
-
-## Development
-
-Quick monorepo package map:
-
-- `packages/server`: Paseo daemon (agent process orchestration, WebSocket API, MCP server)
-- `packages/app`: Expo client (iOS, Android, web)
-- `packages/cli`: `paseo` CLI for daemon and agent workflows
-- `packages/desktop`: Electron desktop app
-- `packages/relay`: Relay transport and encryption used by the daemon and clients
-- `packages/website`: Marketing site and documentation (`paseo.sh`)
-
-Common commands:
-
-```bash
-# run all local dev services
-npm run dev
-
-# run individual surfaces
-npm run dev:server
-npm run dev:app
-npm run dev:desktop
-npm run dev:website
-
-# build the server stack
+npm ci
 npm run build:server
-
-# repo-wide checks
-npm run typecheck
+npm run build:desktop:lite
 ```
 
-## Related projects
+`build:desktop:lite` 构建 daemon/CLI、桌面 UI 和 Windows x64 NSIS/ZIP，使用 [轻量打包配置](packages/desktop/electron-builder.lightweight.yml)，输出到 `packages/desktop/release-lite/`，不自动发布网站、手机包或 Release。
 
-- [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay) — official distributed relay, written in Elixir
-- [paseo-vscode](https://marketplace.visualstudio.com/items?itemName=hinnes.paseo-vscode) — VS Code extension
+Windows 打包还依赖 Electron Builder 对应平台工具；Linux/WSL 跨平台构建可能需要 Wine 或 Windows 侧资源编辑与封装，不能把未经核验的中间目录当作最终交付。构建过程与已验证边界见 [Windows 桌面评估](docs/windows-desktop-evaluation.md) 和 [定制计划](docs/customization-plan.md)。
 
-## License
+## 验证状态与限制
 
-Apache-2.0
+- 已完成各批定向测试、工作区类型检查、lint、服务端构建和 Electron UI 导出；lite.2 的会话、主题及 Codex 改名相关测试共 363 项通过。
+- 已验证 Windows 安装/解压产物、UI 与托管 daemon 启动，以及通过公网 Relay 读取 WSL 状态。
+- 原版手机与公司网络下的真实聊天、审批、重连、通知仍需设备联调；尚未完成同负载的原版/定制版完整性能对照。
+- CLI 的部分状态探测期限只有 1500 ms，公网 Relay 握手较慢时可能误报不可达；不要据此直接重启 daemon。
+
+本仓库描述通用定制能力。个人角色分工、项目研究工作流、模型凭据与主机配对信息由各主机/项目维护，不作为通用默认配置分发。
+
+## 文档与来源
+
+- [定制范围、实施记录与验收](docs/customization-plan.md)
+- [Windows 桌面方案评估](docs/windows-desktop-evaluation.md)
+- [系统架构](docs/architecture.md) · [开发指南](docs/development.md)
+- [Provider 扩展](docs/providers.md) · [自定义 ACP Provider](docs/custom-providers.md)
+- [上游 Paseo](https://github.com/getpaseo/paseo)
+
+感谢上游 Paseo 项目。保留原作者版权声明，许可见 [LICENSE](LICENSE)（Apache-2.0；第三方组件遵循各自许可）。
