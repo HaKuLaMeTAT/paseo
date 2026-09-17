@@ -60,7 +60,7 @@ export async function createAgentMcpServer(options: AgentMcpServerOptions): Prom
         const { resultFormat, ...input } = args as Record<string, unknown>;
         return toMcpToolResult(
           await catalog.executeTool(tool.name, input, { signal: context?.signal }),
-          resultFormat === "text",
+          resultFormat === "text" || (tool.name === "read_context_file" && resultFormat !== "both"),
         );
       },
     );

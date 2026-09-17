@@ -1,24 +1,35 @@
 <p align="center">
-  <img src="packages/desktop/assets/icon-windows.png" width="96" height="96" alt="Paseo Lite 图标">
+  <img src="packages/desktop/assets/icon-windows.png" width="96" height="96" alt="Paseo 后端定制版图标">
 </p>
 
-<h1 align="center">Paseo Lite</h1>
+<h1 align="center">Paseo Bridge</h1>
 
-<p align="center">面向 WSL、Windows 桌面与原版手机 App 的个人定制版</p>
+<p align="center">以 Paseo 为入口，按角色协调多个 CLI Agent</p>
 
-基于 [getpaseo/paseo](https://github.com/getpaseo/paseo)，保留本地 AI agent、多主机连接与加密 Relay，关闭不使用的功能并减少空闲后台工作。当前定制桌面版本为 **0.8.0-lite.6**。
+基于 [getpaseo/paseo](https://github.com/getpaseo/paseo)。新框架使用 **Paseo Bridge** 名称：
+Paseo 客户端处理需求与验收，daemon 提供有边界的原生任务接口，管理 CLI 子会话与 Relay。
+此前 Paseo Lite 的后台裁剪继续保留；历史桌面包、协议、npm 包名和 `~/.paseo` 数据目录不做破坏性改名。
 
-这里的 Lite 指功能裁剪与后台行为调整。桌面仍使用 Electron，尚未完成同负载的原版性能对照，不承诺内存降低比例。
+## 当前入口
+
+公司电脑和手机继续使用 Paseo，主会话可选已配置的 Codex、Claude、OpenCode 或 ACP Provider。
+任务协调现已接入 daemon 的 `task` / `task_roles`，执行者是可以直接管理的原生子会话。
+主会话提交后结束当前轮，由后台保存完成状态、空闲通知及有界结果，避免持续短时轮询。
+
+上下文优化包括角色入口按需加载、项目合同受控读取、有限追加预算、精简工具结果和无损紧凑证据。
+实现、迁移范围与验证限制见 [原生任务](docs/native-tasks.md)。旧独立 Bridge 和轻量面板已退役，历史任务数据保留，
+历史桌面包不追溯改名；真实业务的token/订阅节省仍需同等任务对照。
 
 ## 使用场景
 
-| 设备         | 运行方式                                                                        |
-| ------------ | ------------------------------------------------------------------------------- |
-| 家里 WSL     | 运行 daemon 和本地 agent，保存配置、项目及会话；家里 Windows 无需安装桌面客户端 |
-| 公司 Windows | 使用免安装桌面包，运行公司本地 agent，同时通过 Relay 连接家里 WSL               |
-| 手机         | 使用原版 Paseo App，通过 Relay 连接主机；不修改或重新发布手机 App               |
+| 设备         | 运行方式                                        |
+| ------------ | ----------------------------------------------- |
+| 家里 WSL     | Paseo daemon、CLI 与原生任务协调端              |
+| 公司 Windows | Paseo 客户端与本地执行主机；通过 Relay 访问家里 |
+| 手机         | 原版 Paseo App，使用 Relay 访问主机             |
 
-两台主机各自持有工作区和会话。多主机连接不等于自动复制项目、凭据或执行状态。
+两台主机各自保存项目、凭据、角色与会话；原生任务记录保存在执行 daemon，不自动跨主机复制。
+公司没有罗盘项目时只需更新免安装包；通过 Relay 使用 WSL 罗盘无需在公司复制项目规则。
 
 ## 我们定制了什么
 
@@ -72,7 +83,7 @@ Relay 与端到端加密、多主机配对、会话创建/发送/中断/审批�
 
 ### Windows 免安装包
 
-当前交付文件为 `Paseo-Lite-0.8.0-lite.6-x64.zip`，约 180 MiB。公司电脑本地运行 Agent 时，也必须替换完整包以更新内置 daemon；只连接新版 WSL 的客户端可继续使用旧包。**完整解压后运行 `Paseo.exe`**，不能只拷贝一个 EXE。添加主机时粘贴目标 daemon 生成的完整 Relay 配对链接。
+当前交付文件为 `Paseo-Lite-0.8.0-lite.8-x64.zip`。公司电脑本地运行 Agent 时，也必须替换完整包以更新内置 daemon；只连接新版 WSL 的客户端可继续使用旧包。**完整解压后运行 `Paseo.exe`**，不能只拷贝一个 EXE。添加主机时粘贴目标 daemon 生成的完整 Relay 配对链接。
 
 ZIP 无需安装，但配置与会话仍写入用户目录，不是数据随 ZIP 一起移动的便携模式。包不包含主机的账号凭据或配对信息。
 

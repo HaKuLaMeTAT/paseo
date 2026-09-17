@@ -80,6 +80,7 @@ export interface CreateAgentFromSessionInput {
 
 export interface CreateAgentFromMcpInput {
   kind: "mcp";
+  messageId?: string;
   provider: string;
   title: string;
   initialPrompt?: string;
@@ -364,6 +365,7 @@ async function resolveMcpCreateAgent(
       env: input.env,
     },
     prompt: trimmedPrompt ? trimmedPrompt : undefined,
+    runOptions: input.messageId ? { clientMessageId: input.messageId } : undefined,
     setupContinuation,
     createdWorktree,
     background: input.background,

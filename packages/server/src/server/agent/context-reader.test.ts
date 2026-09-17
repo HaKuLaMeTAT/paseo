@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, symlink, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, symlink, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test, expect } from "vitest";
@@ -74,6 +74,13 @@ test("shares task allowance across concurrent files, preserves partial tails and
     });
     expect(justified.unchanged).toBe(false);
     expect(justified.text).toHaveLength(8000);
+    expect(
+      await reader.read(dir, {
+        path: "large.md",
+        offset: 54000,
+        budgetReason: "The extra allowance must not be renewable",
+      }),
+    ).toMatchObject({ budgetExceeded: true });
     reader.beginTask("user-2");
     expect((await reader.read(dir, { path: "large.md", offset: 54000 })).remainingChars).toBe(
       44000,
@@ -127,5 +134,30 @@ test("allows configured skill Markdown but rejects unrelated files and escaped s
       rm(dir, { recursive: true, force: true }),
       rm(skills, { recursive: true, force: true }),
     ]);
+  }
+});
+
+test("allows repository ancestor contracts while blocking escaped docs and unrelated files", async () => {
+  const root = await mkdtemp(join(tmpdir(), "paseo-contracts-"));
+  try {
+    const cwd = join(root, "project", "worker");
+    await mkdir(cwd, { recursive: true });
+    await mkdir(join(root, ".git"));
+    await mkdir(join(root, "project", "docs"));
+    await writeFile(join(root, "project", "docs", "workflow.md"), "required contract");
+    await writeFile(join(root, "private.md"), "not approved");
+    const reader = new ContextReader([]);
+    expect((await reader.read(cwd, { path: "../docs/workflow.md" })).text).toBe(
+      "required contract",
+    );
+    await expect(reader.read(cwd, { path: "../../private.md" })).rejects.toThrow(
+      "inside the current workspace",
+    );
+    await symlink("/etc/hosts", join(root, "project", "docs", "escape.md"));
+    await expect(reader.read(cwd, { path: "../docs/escape.md" })).rejects.toThrow(
+      "inside the current workspace",
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });

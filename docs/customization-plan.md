@@ -1,6 +1,8 @@
-# Paseo 轻量定制计划
+# Paseo Bridge 定制计划
 
-状态：2026-09-16 与用户确认的范围；本文件是定制决策的唯一来源。已进入首批功能裁剪与后台优化，验证结果见下文。
+状态：2026-09-17 用户批准回归 Paseo 主入口；daemon 原生任务与已定位的上下文开销修复已通过定向验证，Lite.8 Windows 包和 WSL 运行目录已准备，WSL 已获授权切换并重启，范围见 [原生任务](native-tasks.md)。此前 Bridge 与 Lite 的历史记录保留。
+
+2026-09-17：退役前一日的独立 Codex Bridge MCP 与轻量面板，保留原生任务接口和历史数据。下文保留此前 Lite 裁剪范围和发布记录；历史版本不追溯改名。
 桌面技术验证见 [Windows 桌面验证](windows-desktop-evaluation.md)。
 
 ## 使用场景与约束
@@ -8,7 +10,7 @@
 - 家里只在 WSL 运行 daemon 和本地 agent，不保留 Windows 桌面安装。公司电脑使用 Windows x64 免安装 ZIP，同时运行本地 daemon 和 agent。
 - 公司客户端同时连接公司 daemon 与家里 WSL；手机与公司通过 Relay 访问家里 WSL。
 - 手机使用原版 App，不修改、不重新发布。保留协议、配对、加密、重连和版本兼容。
-- Windows 保留独立 App 窗口及聊天工作台 UI；本轮保留 Electron，暂不重写外壳。
+- Windows 使用现有 Electron 客户端，按[原生任务契约](native-tasks.md)协调角色，不重写外壳。
 - 家里与公司各自持有项目、工作区与会话，不引入跨主机执行状态复制。
 - 关闭桌面窗口不应隐式结束后台 agent。桌面关闭与 daemon 停止分别控制。
 

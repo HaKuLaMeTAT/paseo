@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createCli } from "./cli.js";
 
 describe("canonical CLI surface", () => {
@@ -9,6 +9,8 @@ describe("canonical CLI surface", () => {
   it("shows project, workspace, and heartbeat commands while hiding worktree compatibility", () => {
     const cli = createCli();
     const help = cli.helpInformation();
+    expect(help).not.toContain("bridge");
+    expect(help).not.toContain("companion");
     expect(help).toContain("project");
     expect(help).toContain("workspace");
     expect(help).toContain("heartbeat");
@@ -96,3 +98,131 @@ describe("canonical CLI surface", () => {
     ).toContain("--id <id>");
   });
 });
+
+describe("task verification", () => {
+  it("reports failed and timed out verification without turning them into success", async () => {
+    const { verifyTask: verify } = await import("@getpaseo/server");
+    const cwd = process.cwd();
+    expect(
+      await verify({
+        command: process.execPath,
+        args: ["-e", "process.exit(2)"],
+        cwd,
+        timeoutMs: 1000,
+      }),
+    ).toMatchObject({ status: "failed", exitCode: 2 });
+    expect(
+      await verify({
+        command: process.execPath,
+        args: ["-e", "setTimeout(()=>{},10000)"],
+        cwd,
+        timeoutMs: 50,
+      }),
+    ).toMatchObject({ status: "timeout" });
+  });
+});
+
+it("runs profile tasks as native subagents with idempotent submission and bounded recoverable results", async () => {
+  const { createTestPaseoDaemon } =
+    await import("../../server/src/server/test-utils/paseo-daemon.js");
+  const { connectToDaemon } = await import("./utils/client.js");
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StreamableHTTPClientTransport } =
+    await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+  const daemon = await createTestPaseoDaemon({
+    mcpEnabled: true,
+    agentProfiles: [
+      {
+        id: "review",
+        name: "Review",
+        provider: "claude",
+        model: "claude-test-model",
+        modeId: "default",
+      },
+    ],
+  });
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  await mkdir(join(daemon.paseoHome, "native-tasks"), { recursive: true });
+  await writeFile(
+    join(daemon.paseoHome, "native-tasks", "verifiers.json"),
+    JSON.stringify({
+      review: {
+        command: process.execPath,
+        args: ["-e", "console.log('verified')"],
+        cwd: daemon.paseoHome,
+        timeoutMs: 1000,
+      },
+    }),
+  );
+  const client = await connectToDaemon({
+    target: { kind: "endpoint", host: `127.0.0.1:${daemon.port}` },
+  });
+  const mcp = new Client({ name: "native-task-test", version: "1" });
+  try {
+    const parent = await client.createAgent({
+      provider: "codex",
+      cwd: daemon.paseoHome,
+      title: "Parent",
+    });
+    const token = daemon.daemon.agentManager.getMcpAuthToken();
+    await mcp.connect(
+      new StreamableHTTPClientTransport(
+        new URL(`http://127.0.0.1:${daemon.port}/mcp/agents?callerAgentId=${parent.id}`),
+        { requestInit: { headers: token ? { Authorization: `Bearer ${token}` } : {} } },
+      ),
+    );
+    expect(
+      (await mcp.listTools()).tools.find((t) => t.name === "task")?.inputSchema.properties,
+    ).toHaveProperty("action");
+    const call = async (args: object) => {
+      const r = await mcp.callTool({ name: "task", arguments: args as Record<string, unknown> });
+      expect(r.isError, JSON.stringify(r.content)).toBeFalsy();
+      const block = (r.content as Array<{ type: string; text?: string }>).find(
+        (c) => c.type === "text",
+      );
+      return JSON.parse(block!.text!);
+    };
+    const input = {
+      action: "submit",
+      taskId: "snapshot-one",
+      requestId: "independent",
+      role: "review",
+      brief: "Return a bounded review",
+    };
+    const first = await call(input);
+    const replay = await call(input);
+    expect(replay.agentId).toBe(first.agentId);
+    expect(
+      (await client.fetchAgent({ agentId: first.agentId }))?.agent.labels["paseo.parent-agent-id"],
+    ).toBe(parent.id);
+    await vi.waitFor(
+      async () => {
+        const result = await call({ action: "result", taskId: input.taskId, role: input.role });
+        expect(result.state).toBe("completed");
+        expect(result.result).toBe("Hello world");
+        expect(result.verification.status).toBe("passed");
+      },
+      { timeout: 10000 },
+    );
+    const continued = await call({
+      ...input,
+      action: "continue",
+      requestId: "cross",
+      brief: "Review the delta",
+    });
+    expect(continued.agentId).toBe(first.agentId);
+    await vi.waitFor(
+      async () => {
+        expect(
+          (await call({ action: "result", taskId: input.taskId, role: input.role })).state,
+        ).toBe("completed");
+      },
+      { timeout: 10000 },
+    );
+  } finally {
+    await mcp.close();
+    await client.close();
+    await daemon.close();
+  }
+}, 30000);

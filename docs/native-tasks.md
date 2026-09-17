@@ -1,0 +1,78 @@
+# Paseo 原生任务
+
+2026-09-17：主入口回到 Paseo，任务协调放入 daemon。公司本地与家里 WSL 分别执行各自任务；
+原版手机与现有桌面通过已有父子会话协议管理执行者，不要求主模型为 Codex。
+
+## 使用
+
+主会话用 `task_roles` 查询精简角色目录，选择实际 Profile ID。`task` 的 submit/continue
+接收稳定 taskId/requestId 字符串、role、brief，不要求模型生成 UUID。后端生成消息 ID，
+将 Profile 模型、思考等级和权限模式物化到原生子会话；跨 Provider 不继承不兼容权限模式。
+缺少必要配置直接报错，不切换付费渠道。
+
+新任务创建子会话；同一任务追加修改用 continue，独立研究用新 taskId。父会话停止当前轮，
+daemon 保存完成并在父会话空闲后发精简通知；父会话取一次 result 后交付，不循环等待。
+完整日志留在子会话。用户可使用原有子会话区域查看、停止、继续、归档或显式脱离关系。
+人工接管、归档或脱离后，任务接口不会擅自中断另一条消息。
+
+`list/status/result/cancel` 只操作当前父会话的任务。任务按父会话、任务 ID、Profile 标识区分，
+并发提交共享 daemon 内部锁；请求落盘后再启动。网络重试不重发已尝试过的消息。
+用户自由输入使用的 taskId/requestId 与后端生成的原生消息 UUID 是不同层的身份。
+
+## 恢复、结果与验证
+
+记录在 daemon 数据目录 `native-tasks/`，仅保存有界任务输入、对应轮次最终结果和用量，
+不复制完整父历史。完成需匹配稳定消息 ID、原生 turnId 和终止事件；失败不会伪装成完成。
+客户端/MCP 断线不影响 daemon 观察。daemon 崩溃造成无法证实的派发或完成返回 needs_review；
+通过原生子会话核查后再取消或继续，不自动重跑模型。历史轮次仍保存在私有任务记录。
+
+通知只含任务标识和状态，正文由 result 返回一次；再次显式 result 用于恢复。
+通知不替换活跃主任务。进程重启后未送达通知不保证自动补发，使用 list/status 找回任务。
+
+可选验证来自 `native-tasks/verifiers.json`，键为 Profile ID，配置为 command、args、cwd、
+timeoutMs（最多30000）、label。路径属于该 daemon 主机，任务输入不能注入命令。
+验证命令由 daemon 维护，shell=false，超时清理进程树。运行前持久化 interrupted，
+进程退出不自动重做结果未知的验证；没有配置时明确 not_configured。
+机器检查通过不等于人工验收，更不等于罗盘业务签发。
+
+## 上下文约束
+
+- 罗盘 Skill 入口只处理角色路由，完整规则保留在 coordinator-workflow 引用，由协调者按需读取。
+- 读取层允许工作区内文件、home skills，以及同一 Git 仓库祖先的 docs/.agents/skills Markdown。
+  路径经 realpath 校验，不能用目录或文件软链接跨出授权范围。其他父目录数据仍不可读。
+- 一轮共享48000字符，必要证据的理由式扩展累计最多8000字符。无限理由不再重置额度。
+  额度不足返回明确缺口；这是 read_context_file 的约束，不声称控制 Provider 所有 shell/Read 输出。
+- 文本结果直接呈现内容和精简元数据，JSON字段投影使用紧凑编码。默认不同时返回两份读取正文。
+  外层工具仍可能截断过量批读，因此 Skill 明确按外层上限分批及只展开 MCP 文本一次。
+- 持仓初始/刷新 packet 使用无损紧凑 JSON，交叉轮使用既有 focused delta；选股继续使用按标的、
+  按证据面分页的 context_evidence 视图。来源、账户、风险、反证、时效和签发门保持原合同。
+- 模型内建工具仍受其 Provider 能力与权限控制，不能承诺任意模型永远不重复读或不产生额外token。
+
+## 兼容范围
+
+此迁移不改变原生手机协议、不重写 Electron 外壳，也不自动移动历史 Bridge 任务。
+独立 Bridge MCP、companion 面板、静态网页构建和专用命令已移除。新的 Paseo 工作流使用
+daemon task 工具；旧私有任务 JSON 保留供审计，不自动导入或重新执行。
+
+WSL 使用新版 daemon 后，已有远程桌面和手机即可看到原生子会话；正在运行的 Provider 可能需
+关闭后恢复或新建会话才重新发现工具。公司本地必须升级其 daemon，不能只更新远端 WSL。
+两台执行主机不自动同步项目或角色业务文件；公司项目应同步对应罗盘 Skill 与工作流修改。
+
+## 验证边界
+
+隔离 daemon + 假 Provider 实测跨 Codex/Claude 的创建、重复提交、原生父子关系、完成归属、
+精简结果、同子会话继续；实际模型、公司端和手机现场未用来消耗额度验收。
+原生任务及命令面定向验证覆盖创建、去重、继续、验证失败与超时；MCP文件121项、读取文件6项及持仓证据合同定向2项已通过。
+现场33,259字符的持仓独立包无损紧凑化后23,323字符，减少29.9%（保留换行，避免原生Read对超长单行截断）；这不是token/账单节省比例。
+完整费用账本及更深的证据字段删减不在本次已验证范围。
+
+## 本次交付状态
+
+Windows 免安装包位于 `.artifacts/windows/release/Paseo-Lite-0.8.0-lite.8-x64.zip`，
+SHA256 为 `6997a95c9fcb5c039c8572a5627a0654732d2ba700a8e88e5b33900d424e99dc`。
+隔离 Windows 启动非空页面、无捕获页面错误；ZIP CRC 通过，WSL/Windows 核心运行文件与验证构建逐字节一致。
+公司存在罗盘项目时，另合入同目录 `Paseo-Native-Tasks-Compass-Update.zip` 的8个项目文件；先备份并保留公司独有改动。
+WSL 新版在 `~/.local/share/paseo-lite/0.8.0-lite.8`，激活脚本为 `.artifacts/wsl/activate-lite8.sh`。
+2026-09-17 已获授权停旧 supervisor、启动 Lite.8，沿用原 `~/.paseo`，角色与 Relay 保留。
+旧面板进程、静态服务、面板专用 Cloudflare 隧道及 Codex Bridge MCP 注册已退役。
+旧源码和 MCP 配置备份在主机私有 `~/.local/share/paseo-migrations/`；历史会话和任务数据未删除。

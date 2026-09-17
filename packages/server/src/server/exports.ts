@@ -116,3 +116,9 @@ export {
 export { resolveConfigFromPersisted } from "./config.js";
 
 export { ensurePrivateDirectory } from "./private-files.js";
+
+export {
+  verify as verifyTask,
+  VerificationSchema,
+  VerificationResultSchema,
+} from "./agent/task-verification.js";

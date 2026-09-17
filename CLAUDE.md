@@ -27,6 +27,7 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 | [docs/customization-plan.md](docs/customization-plan.md)                 | Confirmed lightweight customization scope and acceptance criteria                                                              |
 | [docs/windows-desktop-evaluation.md](docs/windows-desktop-evaluation.md) | Bounded Windows shell evaluation and evidence                                                                                  |
 | [docs/architecture.md](docs/architecture.md)                             | System design, package layering, WebSocket protocol, agent lifecycle, data flow                                                |
+| [docs/native-tasks.md](docs/native-tasks.md)                             | Daemon-owned task execution, native subagent management, bounded context and migration limits                                  |
 | [docs/agent-lifecycle.md](docs/agent-lifecycle.md)                       | Agent states, parent/child relationships, archive semantics, tabs vs archive, subagents track                                  |
 | [docs/data-model.md](docs/data-model.md)                                 | File-based JSON persistence, Zod schemas, atomic writes, no migrations                                                         |
 | [docs/glossary.md](docs/glossary.md)                                     | Authoritative terminology — UI label wins, no synonyms                                                                         |

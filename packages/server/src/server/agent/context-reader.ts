@@ -33,7 +33,7 @@ function projectJsonFields(source: string, fields: string[], offset: number, lim
   const projected: Record<string, unknown> = Object.create(null);
   for (const field of fields) projected[field] = select(data, field.split("."));
   return {
-    text: JSON.stringify(projected, null, 2),
+    text: JSON.stringify(projected),
     nextArrayOffset: more ? offset + limit : undefined,
   };
 }
@@ -49,6 +49,31 @@ async function allowedDocument(root: string, file: string, skillRoots: string[])
   for (const skillRoot of skillRoots) {
     const resolved = await realpath(skillRoot).catch(() => null);
     if (resolved && containsPath(resolved, file)) return true;
+  }
+  // Only repository-owned Markdown contracts may be read above a sub-workspace.
+  // Resolve both roots and targets so an approved directory cannot escape by symlink.
+  let repository: string | null = null;
+  for (let parent = root; ; parent = path.dirname(parent)) {
+    if (
+      await stat(path.join(parent, ".git")).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      repository = parent;
+      break;
+    }
+    if (parent === path.dirname(parent)) break;
+  }
+  if (repository) {
+    for (let parent = root; containsPath(repository, parent); parent = path.dirname(parent)) {
+      for (const name of ["docs", ".agents/skills"]) {
+        const approved = await realpath(path.join(parent, name)).catch(() => null);
+        if (approved && containsPath(repository, approved) && containsPath(approved, file))
+          return true;
+      }
+      if (parent === repository) break;
+    }
   }
   for (let parent = root; ; parent = path.dirname(parent)) {
     if (["AGENTS.md", "CLAUDE.md"].some((name) => path.join(parent, name) === file)) return true;
@@ -86,7 +111,6 @@ function selectContext(source: string, file: string, input: ContextReadInput) {
     start,
     lineLimit,
     offset,
-    requestedBudget,
     arrayOffset,
     arrayLimit,
   ]);
@@ -94,11 +118,13 @@ function selectContext(source: string, file: string, input: ContextReadInput) {
 }
 
 export const CONTEXT_TASK_CHAR_BUDGET = 48000;
+export const CONTEXT_TASK_EXTRA_CHAR_BUDGET = 8000;
 
 export class ContextReader {
-  private readonly seen = new Map<string, string>();
+  private readonly seen = new Map<string, { hash: string; end: number }>();
   private taskId: string | undefined;
   private remainingChars = CONTEXT_TASK_CHAR_BUDGET;
+  private extraChars = CONTEXT_TASK_EXTRA_CHAR_BUDGET;
   constructor(
     private readonly skillRoots = [
       path.join(homedir(), ".codex/skills"),
@@ -110,6 +136,11 @@ export class ContextReader {
     if (taskId === this.taskId) return;
     this.taskId = taskId;
     this.remainingChars = CONTEXT_TASK_CHAR_BUDGET;
+    this.extraChars = CONTEXT_TASK_EXTRA_CHAR_BUDGET;
+  }
+
+  private allowance(reason?: string): number {
+    return this.remainingChars || (reason?.trim() ? this.extraChars : 0);
   }
 
   async read(cwd: string, input: ContextReadInput) {
@@ -132,27 +163,31 @@ export class ContextReader {
       input,
     );
     const hash = createHash("sha256").update(selected).digest("hex");
-    const unchanged = !input.force && this.seen.get(key) === hash;
-    if (!unchanged && this.remainingChars === 0 && !input.budgetReason?.trim()) {
+    const served = this.seen.get(key);
+    const unchanged =
+      !input.force &&
+      served?.hash === hash &&
+      served.end >= Math.min(selected.length, offset + requestedBudget);
+    const allowance = this.allowance(input.budgetReason);
+    if (!unchanged && allowance === 0) {
       return {
         path: relative,
         budgetExceeded: true,
         remainingChars: 0,
-        text: "Task read budget reached. Summarize existing evidence. For indispensable missing evidence, request a focused range with budgetReason; do not dump the file through shell.",
+        text: "Task read allowance exhausted. Summarize existing evidence; a justified extension is capped at 8000 characters per task. If necessary evidence remains missing, report blocked. Do not bypass through shell.",
         truncated: true,
         nextOffset: offset,
       };
     }
-    const budget = Math.min(requestedBudget, this.remainingChars || requestedBudget);
+    const budget = Math.min(requestedBudget, allowance);
     const text = unchanged
       ? "Already read; selected content is unchanged. Use force only if it is no longer in context."
       : selected.slice(offset, offset + budget);
-    if (!unchanged) this.remainingChars = Math.max(0, this.remainingChars - text.length);
-    // A reduced task allowance must not mark an unserved tail as already read.
-    if (unchanged || budget === requestedBudget || offset + budget >= selected.length) {
-      this.seen.delete(key);
-      this.seen.set(key, hash);
+    if (!unchanged) {
+      if (this.remainingChars) this.remainingChars -= text.length;
+      else this.extraChars -= text.length;
     }
+    if (!unchanged) this.seen.set(key, { hash, end: offset + text.length });
     if (this.seen.size > 128) this.seen.delete(this.seen.keys().next().value!);
     const truncated = offset + budget < selected.length;
     return {
@@ -161,6 +196,7 @@ export class ContextReader {
       hash,
       text,
       remainingChars: this.remainingChars,
+      remainingExtraChars: this.extraChars,
       ...(input.budgetReason ? { budgetReason: input.budgetReason } : {}),
       ...(nextArrayOffset !== undefined ? { nextArrayOffset } : {}),
       truncated,

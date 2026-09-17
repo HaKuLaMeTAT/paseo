@@ -1,3 +1,4 @@
+import { nativeTasks } from "../native-tasks.js";
 import { getContextReader } from "../context-reader.js";
 import {
   DELEGATION_KEY,
@@ -1015,6 +1016,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     settings: CreateAgentSettingsInputSchema.optional().describe(
       "Initial runtime settings for the new agent.",
     ),
+    messageId: z.string().uuid().optional(),
     initialPrompt: z
       .string()
       .trim()
@@ -1127,6 +1129,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     .object(legacyTopLevelCreateAgentInputSchema)
     .strict();
   const commonSendAgentPromptInputSchema = {
+    messageId: z.string().uuid().optional(),
     agentId: z.string(),
     prompt: z.string(),
     sessionMode: z.string().optional().describe("Optional mode to set before running the prompt."),
@@ -1431,7 +1434,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     {
       title: "Read focused context",
       description:
-        "Read bounded workspace files or Markdown in configured home skill directories and ancestor AGENTS.md/CLAUDE.md. Unchanged selections are omitted. JSON requires dot-path fields; * projects array entries with arrayOffset/arrayLimit. Follow nextOffset/nextLine/nextArrayOffset for omitted evidence; force rereads after compaction.",
+        "Read bounded workspace files, repository ancestor docs/skills Markdown, or home skills and ancestor instructions. Unchanged selections are omitted. JSON requires dot-path fields; * projects array entries with arrayOffset/arrayLimit. Follow nextOffset/nextLine/nextArrayOffset for omitted evidence; force rereads after compaction.",
       inputSchema: {
         path: z.string().min(1),
         fields: z.array(z.string().min(1)).min(1).max(30).optional(),
@@ -1445,7 +1448,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
           .max(16000)
           .optional()
           .describe(
-            "Output is capped at 8000 characters; default 4000, shared task allowance 48000.",
+            "Output is capped at 8000 characters; default 4000, shared task allowance 48000 plus a total 8000 justified extension. Unpack MCP content text once; do not print whole response objects or batch many large reads.",
           ),
         force: z.boolean().optional(),
         arrayOffset: z.number().int().min(0).optional(),
@@ -1466,7 +1469,11 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
       if (!callerAgentId || !caller)
         throw new Error("read_context_file requires an agent-scoped caller");
       const result = await getContextReader(agentManager, callerAgentId).read(caller.cwd, input);
-      return { content: [], structuredContent: ensureValidJson(result) };
+      const { text, ...metadata } = result;
+      return {
+        content: [{ type: "text", text: `${JSON.stringify(metadata)}\n${text}` }],
+        structuredContent: ensureValidJson(result),
+      };
     },
   );
 
@@ -1565,6 +1572,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
             provider: parsedArgs.provider,
             title: parsedArgs.title,
             initialPrompt: parsedArgs.initialPrompt,
+            messageId: parsedArgs.messageId,
             config: inheritedConfig,
             cwd: resolvedArgs.cwd,
             workspaceId: resolvedArgs.workspaceId,
@@ -2046,6 +2054,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     async ({
       agentId,
       prompt,
+      messageId,
       sessionMode,
       background = Boolean(callerAgentId),
       notifyOnFinish = Boolean(callerAgentId),
@@ -2057,6 +2066,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
         agentStorage,
         agentId,
         prompt,
+        messageId,
         sessionMode,
         logger: childLogger,
       });
@@ -3321,6 +3331,53 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
       };
     },
   );
+
+  registerTool(
+    "task_roles",
+    {
+      title: "Task roles",
+      description:
+        "List compact configured task roles without loading every role's notes. Pass role to inspect the selected profile's full instructions. No model call.",
+      inputSchema: { role: z.string().optional() },
+    },
+    async ({ role }) => {
+      const profiles = daemonConfigStore?.get().agentProfiles ?? [];
+      if (role && !profiles.some((p) => p.id === role))
+        throw new Error("Unknown configured profile");
+      const result = role
+        ? profiles.find((p) => p.id === role)
+        : profiles.map((p) => ({ id: p.id, name: p.name, provider: p.provider, model: p.model }));
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+
+  if (callerAgentId && options.paseoHome) {
+    registerTool(
+      "task",
+      {
+        title: "Native delegated task",
+        description:
+          "Submit a bounded task using role=an existing profile ID from task_roles. Use stable taskId and requestId strings (UUID not required). Creates a managed native subagent; daemon persists completion and sends one bounded result when you are idle. End your turn after dispatch instead of polling. Continue reuses the same task; list/status/result recover existing work. Do not duplicate business research in the parent.",
+        inputSchema: {
+          action: z.enum(["list", "submit", "continue", "status", "result", "cancel"]),
+          taskId: z.string().optional(),
+          role: z.string().optional(),
+          requestId: z.string().optional(),
+          brief: z.string().optional(),
+        },
+      },
+      async (input: unknown) => ({
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              await nativeTasks(options).execute(callerAgentId, input, toCatalog()),
+            ),
+          },
+        ],
+      }),
+    );
+  }
 
   return toCatalog();
 }
