@@ -1434,9 +1434,22 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
     {
       title: "Read focused context",
       description:
-        "Read bounded workspace files, repository ancestor docs/skills Markdown, or home skills and ancestor instructions. Unchanged selections are omitted. JSON requires dot-path fields; * projects array entries with arrayOffset/arrayLimit. Follow nextOffset/nextLine/nextArrayOffset for omitted evidence; force rereads after compaction.",
+        "Read bounded workspace files, repository ancestor docs/skills Markdown, or home skills and ancestor instructions. Use section for a linked chapter; outline discovers headings without reading the body. Unchanged selections are omitted. JSON requires dot-path fields; * projects array entries with arrayOffset/arrayLimit. Use nextRead verbatim for a truncated selection (including maxLines); nextLine starts the next line window after that selection is complete. Use nextArrayOffset for more entries; force only after context loss.",
       inputSchema: {
         path: z.string().min(1),
+        section: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Exact Markdown heading title, including child headings until the next peer/ancestor. startLine/nextLine are relative to the selected section. Do not drop section when continuing.",
+          ),
+        outline: z
+          .boolean()
+          .optional()
+          .describe(
+            "Markdown heading titles and source line ranges only; excludes fenced code. Use when the required section title is unknown. Cannot combine with section/fields.",
+          ),
         fields: z.array(z.string().min(1)).min(1).max(30).optional(),
         startLine: z.number().int().min(1).optional(),
         maxLines: z.number().int().min(1).max(200).optional(),
@@ -1448,7 +1461,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
           .max(16000)
           .optional()
           .describe(
-            "Output is capped at 8000 characters; default 4000, shared task allowance 48000 plus a total 8000 justified extension. Unpack MCP content text once; do not print whole response objects or batch many large reads.",
+            "Output is capped at 8000 characters; default 4000, 48000-character task review threshold; further missing mandatory sections require a specific budgetReason, still capped per call. Unpack MCP content text once; do not print whole response objects or batch many large reads.",
           ),
         force: z.boolean().optional(),
         arrayOffset: z.number().int().min(0).optional(),
@@ -1460,7 +1473,7 @@ export function createPaseoToolCatalog(options: PaseoToolHostDependencies): Pase
           .max(300)
           .optional()
           .describe(
-            "Specific missing evidence justifying a bounded read beyond the shared task budget; never use shell to bypass it.",
+            "Name the missing mandatory section/evidence and why existing context is insufficient. Allows this bounded read after the review threshold; no new-session replay or shell bypass.",
           ),
       },
     },

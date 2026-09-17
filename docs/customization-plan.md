@@ -1,6 +1,6 @@
 # Paseo Bridge 定制计划
 
-状态：2026-09-17 用户批准回归 Paseo 主入口；daemon 原生任务与已定位的上下文开销修复已通过定向验证，Lite.8 Windows 包和 WSL 运行目录已准备，WSL 已获授权切换并重启，范围见 [原生任务](native-tasks.md)。此前 Bridge 与 Lite 的历史记录保留。
+状态：2026-09-17 用户批准回归 Paseo 主入口；daemon 原生任务与已定位的上下文开销修复已通过定向验证，Lite.10 修复启动规则重复读取和文档阶段加载，WSL 已获授权切换，Windows 包同步构建，范围见 [原生任务](native-tasks.md)。此前 Bridge 与 Lite 的历史记录保留。
 
 2026-09-17：退役前一日的独立 Codex Bridge MCP 与轻量面板，保留原生任务接口和历史数据。下文保留此前 Lite 裁剪范围和发布记录；历史版本不追溯改名。
 桌面技术验证见 [Windows 桌面验证](windows-desktop-evaluation.md)。

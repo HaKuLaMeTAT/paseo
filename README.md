@@ -1,3 +1,5 @@
+> 2026-09-17：本机已停用 Paseo，29 个会话已归档。此仓库保留定制源码与历史验证记录，下面的功能说明不表示服务仍在线。
+
 <p align="center">
   <img src="packages/desktop/assets/icon-windows.png" width="96" height="96" alt="Paseo 后端定制版图标">
 </p>
@@ -83,7 +85,7 @@ Relay 与端到端加密、多主机配对、会话创建/发送/中断/审批�
 
 ### Windows 免安装包
 
-当前交付文件为 `Paseo-Lite-0.8.0-lite.8-x64.zip`。公司电脑本地运行 Agent 时，也必须替换完整包以更新内置 daemon；只连接新版 WSL 的客户端可继续使用旧包。**完整解压后运行 `Paseo.exe`**，不能只拷贝一个 EXE。添加主机时粘贴目标 daemon 生成的完整 Relay 配对链接。
+当前交付文件为 `Paseo-Lite-0.8.0-lite.10-x64.zip`。公司电脑本地运行 Agent 时，也必须替换完整包以更新内置 daemon；只连接新版 WSL 的客户端可继续使用旧包。**完整解压后运行 `Paseo.exe`**，不能只拷贝一个 EXE。添加主机时粘贴目标 daemon 生成的完整 Relay 配对链接。
 
 ZIP 无需安装，但配置与会话仍写入用户目录，不是数据随 ZIP 一起移动的便携模式。包不包含主机的账号凭据或配对信息。
 

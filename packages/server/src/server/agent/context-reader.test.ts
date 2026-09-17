@@ -34,9 +34,8 @@ test("bounds document ranges and paginates without allowing workspace escape", a
     const reader = new ContextReader();
     const first = await reader.read(dir, { path: "doc.md", maxLines: 2, maxChars: 5 });
     expect(first).toMatchObject({ text: "first", truncated: true, nextOffset: 5, nextLine: 3 });
-    expect((await reader.read(dir, { path: "doc.md", maxLines: 2, offset: 5 })).text).toBe(
-      "\nsecond",
-    );
+    expect(first.nextRead).toMatchObject({ path: "doc.md", maxLines: 2, offset: 5 });
+    expect((await reader.read(dir, { ...first.nextRead!, maxChars: 10 })).text).toBe("\nsecond");
     await symlink("/etc/hosts", join(dir, "escape"));
     await expect(reader.read(dir, { path: "escape" })).rejects.toThrow(
       "inside the current workspace",
@@ -46,7 +45,7 @@ test("bounds document ranges and paginates without allowing workspace escape", a
   }
 });
 
-test("shares task allowance across concurrent files, preserves partial tails and resets only for a new task", async () => {
+test("requires justified continuation after the review threshold without replaying partial reads", async () => {
   const dir = await mkdtemp(join(tmpdir(), "paseo-budget-"));
   try {
     await writeFile(join(dir, "large.md"), "x".repeat(60000));
@@ -73,17 +72,22 @@ test("shares task allowance across concurrent files, preserves partial tails and
       budgetReason: "Need the omitted evidence before making the final decision",
     });
     expect(justified.unchanged).toBe(false);
-    expect(justified.text).toHaveLength(8000);
+    expect(justified.text).toHaveLength(6000);
+    expect(justified.skippedChars).toBe(2000);
+    expect(justified.totalReadChars).toBe(54000);
     expect(
       await reader.read(dir, {
         path: "large.md",
         offset: 54000,
-        budgetReason: "The extra allowance must not be renewable",
+        budgetReason:
+          "Read the final mandatory evidence omitted from the previous bounded selection",
       }),
-    ).toMatchObject({ budgetExceeded: true });
+    ).toMatchObject({ totalReadChars: 58000, budgetWarning: true });
+    const repeated = await reader.read(dir, { path: "large.md", offset: 46000, maxChars: 8000 });
+    expect(repeated).toMatchObject({ unchanged: true, totalReadChars: 58000 });
     reader.beginTask("user-2");
-    expect((await reader.read(dir, { path: "large.md", offset: 54000 })).remainingChars).toBe(
-      44000,
+    expect((await reader.read(dir, { path: "large.md", offset: 58000 })).remainingChars).toBe(
+      46000,
     );
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -159,5 +163,59 @@ test("allows repository ancestor contracts while blocking escaped docs and unrel
     );
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("selects Markdown chapters without loading adjacent routes and preserves selection through pagination", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "paseo-chapters-"));
+  try {
+    await writeFile(
+      join(dir, "routes.md"),
+      [
+        "# Routes",
+        "## Intraday",
+        "first",
+        "```sh",
+        "# fake heading",
+        "```",
+        "### Risk",
+        "mandatory gate",
+        "## After close",
+        "unrelated news route",
+        "## Duplicate",
+        "one",
+        "## Duplicate",
+        "two",
+      ].join("\n"),
+    );
+    const reader = new ContextReader();
+    const outline = await reader.read(dir, { path: "routes.md", outline: true });
+    expect(outline.text).toContain("2-8\t## Intraday");
+    expect(outline.text).not.toContain("fake heading");
+    expect(outline.text).not.toContain("mandatory gate");
+    const first = await reader.read(dir, { path: "routes.md", section: "Intraday", maxChars: 20 });
+    const second = await reader.read(dir, { ...first.nextRead!, maxChars: 8000 });
+    expect(first.nextRead).toMatchObject({ section: "Intraday", offset: 20 });
+    expect(first.text + second.text).toContain("mandatory gate");
+    expect(first.text + second.text).not.toContain("unrelated news route");
+    expect(
+      (await reader.read(dir, { path: "routes.md", section: "Intraday", maxChars: 8000 }))
+        .unchanged,
+    ).toBe(true);
+    await expect(reader.read(dir, { path: "routes.md", section: "Duplicate" })).rejects.toThrow(
+      "found 2",
+    );
+    await expect(reader.read(dir, { path: "routes.md", section: "Missing" })).rejects.toThrow(
+      "found 0",
+    );
+    await expect(
+      reader.read(dir, { path: "routes.md", section: "Intraday", outline: true }),
+    ).rejects.toThrow("cannot be combined");
+    await writeFile(join(dir, "data.json"), "{}");
+    await expect(reader.read(dir, { path: "data.json", outline: true })).rejects.toThrow(
+      "requires Markdown",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });

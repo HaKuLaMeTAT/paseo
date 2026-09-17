@@ -175,6 +175,23 @@ it("runs profile tasks as native subagents with idempotent submission and bounde
     expect(
       (await mcp.listTools()).tools.find((t) => t.name === "task")?.inputSchema.properties,
     ).toHaveProperty("action");
+    await writeFile(
+      join(daemon.paseoHome, "reading.md"),
+      "# Rules\n## Research\nRequired risk gate\n## Development\nUnrelated developer process",
+    );
+    const chapter = await mcp.callTool({
+      name: "read_context_file",
+      arguments: {
+        path: "reading.md",
+        section: "Research",
+        resultFormat: "text",
+      },
+    });
+    expect(chapter.isError).toBeFalsy();
+    expect(chapter.structuredContent).toBeUndefined();
+    expect(JSON.stringify(chapter.content)).toContain("Required risk gate");
+    expect(JSON.stringify(chapter.content)).not.toContain("Unrelated developer process");
+
     const call = async (args: object) => {
       const r = await mcp.callTool({ name: "task", arguments: args as Record<string, unknown> });
       expect(r.isError, JSON.stringify(r.content)).toBeFalsy();
